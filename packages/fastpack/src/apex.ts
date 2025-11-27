@@ -214,3 +214,39 @@ export async function autoCompress(input: CompressInput): Promise<CompressResult
     return compress(input);
   }
 }
+
+// ============================================================================
+// ANS Entropy Coding (standalone)
+// ============================================================================
+
+/**
+ * Compress data using ANS (Asymmetric Numeral Systems) entropy coding
+ *
+ * ANS provides near-optimal compression for data with skewed byte
+ * frequency distributions. Best for:
+ * - Pre-processed data (after structural extraction)
+ * - Data with many repeated byte values
+ * - Low-entropy binary data
+ *
+ * @example
+ * ```typescript
+ * import { ansCompress, ansDecompress } from 'fastpack/apex';
+ *
+ * const data = new Uint8Array([1, 1, 1, 2, 2, 3]);
+ * const compressed = await ansCompress(data);
+ * const original = await ansDecompress(compressed);
+ * ```
+ */
+export async function ansCompress(input: CompressInput): Promise<CompressResult> {
+  const wasm = await getWasm();
+  const data = normalizeInput(input);
+  return wasm.ans_compress(data);
+}
+
+/**
+ * Decompress ANS-encoded data
+ */
+export async function ansDecompress(input: Uint8Array): Promise<CompressResult> {
+  const wasm = await getWasm();
+  return wasm.ans_decompress(input);
+}

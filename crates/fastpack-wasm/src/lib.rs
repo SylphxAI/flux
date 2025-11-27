@@ -8,6 +8,7 @@ use fastpack_core::{
     apex_compress as core_apex_compress,
     apex_decompress as core_apex_decompress,
     ApexOptions, ApexSession,
+    apex::{ans_compress as core_ans_compress, ans_decompress as core_ans_decompress},
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -153,6 +154,24 @@ pub fn apex_session_destroy(session_id: u32) -> bool {
     SESSIONS.with(|sessions| {
         sessions.borrow_mut().remove(&session_id).is_some()
     })
+}
+
+// ============================================================================
+// ANS entropy coding (standalone)
+// ============================================================================
+
+/// Compress data using ANS entropy coding
+/// Best for data with skewed byte distributions
+#[wasm_bindgen]
+pub fn ans_compress(data: &[u8]) -> Vec<u8> {
+    core_ans_compress(data)
+}
+
+/// Decompress ANS-encoded data
+#[wasm_bindgen]
+pub fn ans_decompress(data: &[u8]) -> Result<Vec<u8>, JsValue> {
+    core_ans_decompress(data)
+        .ok_or_else(|| JsValue::from_str("ANS decompression failed"))
 }
 
 // ============================================================================

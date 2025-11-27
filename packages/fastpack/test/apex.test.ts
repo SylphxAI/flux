@@ -6,6 +6,8 @@ import {
   recommendAlgorithm,
   ApexSession,
   autoCompress,
+  ansCompress,
+  ansDecompress,
 } from '../src/apex';
 
 describe('APEX Compression', () => {
@@ -148,6 +150,37 @@ describe('APEX Compression', () => {
       const largeJson = JSON.stringify(Array(100).fill({ id: 1, name: 'test' }));
       const large = await autoCompress(largeJson);
       expect(large.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('ANS Entropy Coding', () => {
+    it('should roundtrip simple data', async () => {
+      const data = new Uint8Array([1, 2, 3, 4, 5]);
+      const compressed = await ansCompress(data);
+      const decompressed = await ansDecompress(compressed);
+      expect(Array.from(decompressed)).toEqual(Array.from(data));
+    });
+
+    it('should roundtrip repeated data', async () => {
+      // ANS works best with skewed distributions
+      const data = new Uint8Array([1, 1, 1, 1, 2, 2, 3]);
+      const compressed = await ansCompress(data);
+      const decompressed = await ansDecompress(compressed);
+      expect(Array.from(decompressed)).toEqual(Array.from(data));
+    });
+
+    it('should handle string input', async () => {
+      const text = 'Hello World';
+      const compressed = await ansCompress(text);
+      const decompressed = await ansDecompress(compressed);
+      expect(new TextDecoder().decode(decompressed)).toBe(text);
+    });
+
+    it('should handle empty data', async () => {
+      const data = new Uint8Array([]);
+      const compressed = await ansCompress(data);
+      const decompressed = await ansDecompress(compressed);
+      expect(decompressed.length).toBe(0);
     });
   });
 });

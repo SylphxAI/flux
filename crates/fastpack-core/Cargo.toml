@@ -8,6 +8,7 @@ description = "High-performance compression library - core implementation"
 [dependencies]
 
 [dev-dependencies]
+flate2 = "1.1.5"
 rand = "0.8"
 
 [[bench]]
