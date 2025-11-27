@@ -1,14 +1,21 @@
 //! FastPack - High-performance compression library
 //!
 //! A fast, streaming-capable compression format optimized for client-server communication.
+//!
+//! ## Algorithms
+//!
+//! - **LZ4-style**: Fast, general-purpose compression (default)
+//! - **APEX**: Advanced JSON-aware compression with learning capabilities
 
 mod compress;
 mod decompress;
 mod frame;
+pub mod apex;
 
 pub use compress::{compress, compress_to, Compressor};
 pub use decompress::{decompress, decompress_to, Decompressor};
 pub use frame::{FrameHeader, Flags, MAGIC, VERSION};
+pub use apex::{apex_compress, apex_decompress, ApexSession, ApexOptions};
 
 /// Compression level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
