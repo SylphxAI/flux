@@ -1,0 +1,17 @@
+[package]
+name = "fastpack-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "High-performance compression library - Node.js native addon"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+fastpack-core.workspace = true
+napi = { version = "2", default-features = false, features = ["napi4", "tokio_rt"] }
+napi-derive = "2"
+
+[build-dependencies]
+napi-build = "2"

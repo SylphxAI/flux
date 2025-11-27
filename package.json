@@ -1,0 +1,21 @@
+{
+  "name": "fastpack-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build:rust && npm run build:ts",
+    "build:rust": "cargo build --release",
+    "build:wasm": "wasm-pack build crates/fastpack-wasm --target web --out-dir ../../packages/fastpack/wasm",
+    "build:ts": "npm -w fastpack run build",
+    "test": "npm run test:rust && npm run test:ts",
+    "test:rust": "cargo test",
+    "test:ts": "npm -w fastpack run test",
+    "clean": "cargo clean && npm -w fastpack run clean",
+    "bench": "cargo bench"
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.12.0"
+  }
+}

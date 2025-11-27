@@ -1,0 +1,38 @@
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+*.node
+
+# WASM build output
+pkg/
+packages/fastpack/wasm/
+packages/fastpack/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+*.lcov
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/fastpack-core",
+    "crates/fastpack-wasm",
+    "crates/fastpack-node",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/user/fastpack"
+authors = ["FastPack Contributors"]
+
+[workspace.dependencies]
+fastpack-core = { path = "crates/fastpack-core" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+strip = true
