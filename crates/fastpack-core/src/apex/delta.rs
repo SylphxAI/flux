@@ -133,11 +133,13 @@ impl DeltaResult {
 }
 
 /// Delta decoder
+#[allow(dead_code)]
 pub struct DeltaDecoder {
     prev_values: Vec<Option<i64>>,
     prev_deltas: Vec<i64>,
 }
 
+#[allow(dead_code)]
 impl DeltaDecoder {
     pub fn new(slot_count: usize) -> Self {
         Self {

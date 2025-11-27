@@ -3,10 +3,10 @@
 //! Main compression engine combining all APEX features.
 
 use super::{
-    dictionary::{Dictionary, DictionaryLevel},
+    dictionary::Dictionary,
     template::{TemplateExtractor, Value},
     tokenizer::is_json,
-    delta::{DeltaEncoder, DeltaResult},
+    ans::{ans_compress, ans_decompress},
     APEX_MAGIC, APEX_VERSION, ApexOptions,
 };
 use crate::{Result, Error};
@@ -15,24 +15,27 @@ use crate::decompress::decompress as lz4_decompress;
 use crate::Options as Lz4Options;
 
 /// Flags for APEX frame
+#[allow(dead_code)]
 mod flags {
     pub const HAS_TEMPLATE: u8 = 0b0000_0001;
     pub const HAS_DICT_UPDATE: u8 = 0b0000_0010;
     pub const DELTA_ENABLED: u8 = 0b0000_0100;
     pub const IS_JSON: u8 = 0b0000_1000;
     pub const LZ4_FALLBACK: u8 = 0b0001_0000;
+    pub const ANS_ENCODED: u8 = 0b0010_0000;
 }
 
 /// APEX Encoder
 pub struct ApexEncoder {
     opts: ApexOptions,
+    #[allow(dead_code)]
     session_dict: Dictionary,
     local_dict: Dictionary,
     template_extractor: TemplateExtractor,
 }
 
 impl ApexEncoder {
-    pub fn new(opts: ApexOptions, session_dict: &Dictionary) -> Self {
+    pub fn new(opts: ApexOptions, _session_dict: &Dictionary) -> Self {
         Self {
             opts,
             session_dict: Dictionary::empty(),
@@ -64,11 +67,24 @@ impl ApexEncoder {
             // Try structural compression for larger JSON
             match self.encode_structural(input) {
                 Ok(structural_data) => {
-                    if structural_data.len() < input.len() {
+                    // Apply ANS entropy coding for better compression
+                    let ans_data = ans_compress(&structural_data);
+
+                    // Use ANS if it provides benefit
+                    let (final_data, use_ans) = if ans_data.len() < structural_data.len() {
+                        (ans_data, true)
+                    } else {
+                        (structural_data, false)
+                    };
+
+                    if final_data.len() < input.len() {
                         frame_flags |= flags::HAS_TEMPLATE;
+                        if use_ans {
+                            frame_flags |= flags::ANS_ENCODED;
+                        }
                         output.push(frame_flags);
-                        output.extend_from_slice(&(structural_data.len() as u32).to_le_bytes());
-                        output.extend_from_slice(&structural_data);
+                        output.extend_from_slice(&(final_data.len() as u32).to_le_bytes());
+                        output.extend_from_slice(&final_data);
                         return Ok(output);
                     }
                 }
@@ -159,12 +175,13 @@ impl ApexEncoder {
 
 /// APEX Decoder
 pub struct ApexDecoder {
+    #[allow(dead_code)]
     session_dict: Dictionary,
     learned_dict: Dictionary,
 }
 
 impl ApexDecoder {
-    pub fn new(session_dict: &Dictionary) -> Self {
+    pub fn new(_session_dict: &Dictionary) -> Self {
         Self {
             session_dict: Dictionary::empty(),
             learned_dict: Dictionary::empty(),
@@ -211,62 +228,73 @@ impl ApexDecoder {
 
         if frame_flags & flags::HAS_TEMPLATE != 0 {
             // Structural decompression
-            return self.decode_structural(&input[pos..]);
+            let ans_encoded = frame_flags & flags::ANS_ENCODED != 0;
+            return self.decode_structural(&input[pos..], ans_encoded);
         }
 
         Err(Error::CorruptedData)
     }
 
-    fn decode_structural(&mut self, input: &[u8]) -> Result<Vec<u8>> {
-        let mut pos = 0;
-
-        // Skip compressed length
-        if pos + 4 > input.len() {
+    fn decode_structural(&mut self, input: &[u8], ans_encoded: bool) -> Result<Vec<u8>> {
+        // First 4 bytes are data length (part of frame format)
+        if input.len() < 4 {
             return Err(Error::CorruptedData);
         }
-        pos += 4;
+        let data_bytes = &input[4..];
 
-        // Read template hash
-        if pos + 8 > input.len() {
+        // If ANS encoded, decode first to get structural data
+        let decoded_input;
+        let structural_data: &[u8] = if ans_encoded {
+            decoded_input = ans_decompress(data_bytes)
+                .ok_or(Error::CorruptedData)?;
+            &decoded_input[..]
+        } else {
+            data_bytes
+        };
+
+        let mut pos = 0;
+
+        // Read template hash (8 bytes)
+        if pos + 8 > structural_data.len() {
             return Err(Error::CorruptedData);
         }
         let _template_hash = u64::from_le_bytes([
-            input[pos], input[pos + 1], input[pos + 2], input[pos + 3],
-            input[pos + 4], input[pos + 5], input[pos + 6], input[pos + 7]
+            structural_data[pos], structural_data[pos + 1], structural_data[pos + 2], structural_data[pos + 3],
+            structural_data[pos + 4], structural_data[pos + 5], structural_data[pos + 6], structural_data[pos + 7]
         ]);
         pos += 8;
 
         // Read template
-        if pos + 2 > input.len() {
+        if pos + 2 > structural_data.len() {
             return Err(Error::CorruptedData);
         }
-        let template_len = u16::from_le_bytes([input[pos], input[pos + 1]]) as usize;
+        let template_len = u16::from_le_bytes([structural_data[pos], structural_data[pos + 1]]) as usize;
         pos += 2;
 
-        if pos + template_len > input.len() {
+        if pos + template_len > structural_data.len() {
             return Err(Error::CorruptedData);
         }
-        let template_bytes = &input[pos..pos + template_len];
+        let template_bytes = &structural_data[pos..pos + template_len];
         pos += template_len;
 
         // Read values
-        if pos + 2 > input.len() {
+        if pos + 2 > structural_data.len() {
             return Err(Error::CorruptedData);
         }
-        let values_len = u16::from_le_bytes([input[pos], input[pos + 1]]) as usize;
+        let values_len = u16::from_le_bytes([structural_data[pos], structural_data[pos + 1]]) as usize;
         pos += 2;
 
-        if pos + values_len > input.len() {
+        if pos + values_len > structural_data.len() {
             return Err(Error::CorruptedData);
         }
-        let values_bytes = &input[pos..pos + values_len];
+        let values_bytes = &structural_data[pos..pos + values_len];
 
         // Reconstruct JSON
         self.reconstruct_json(template_bytes, values_bytes)
     }
 
     fn reconstruct_json(&self, template: &[u8], values: &[u8]) -> Result<Vec<u8>> {
-        use super::template::{TemplateToken, Value, value_type};
+        use super::template::Value;
 
         let mut output = Vec::new();
         let mut t_pos = 0;

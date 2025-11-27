@@ -9,3 +9,7 @@ description = "High-performance compression library - core implementation"
 
 [dev-dependencies]
 rand = "0.8"
+
+[[bench]]
+name = "compression"
+harness = false

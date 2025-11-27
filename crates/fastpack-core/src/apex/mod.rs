@@ -7,20 +7,25 @@
 //! 2. Adaptive dictionary - learns patterns across requests
 //! 3. Predictive encoding - uses JSON grammar for prediction
 //! 4. Delta streams - efficient encoding of sequential data
+//! 5. ANS entropy coding - near-optimal compression
 
 mod tokenizer;
 mod template;
 mod dictionary;
 mod encoder;
 mod delta;
+pub mod ans;
 
 pub use tokenizer::{Token, Tokenizer, is_json};
 pub use template::{Template, TemplateExtractor};
 pub use dictionary::{Dictionary, DictionaryLevel};
 pub use encoder::{ApexEncoder, ApexDecoder};
 pub use delta::DeltaEncoder;
+pub use ans::{ans_compress, ans_decompress, FreqTable};
 
-use crate::{Error, Result};
+use crate::Result;
+#[allow(unused_imports)]
+use crate::Error;
 
 /// APEX magic bytes
 pub const APEX_MAGIC: [u8; 4] = *b"APEX";

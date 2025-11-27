@@ -30,6 +30,7 @@ pub enum TemplateToken {
 }
 
 /// Value types for slots
+#[allow(dead_code)]
 pub mod value_type {
     pub const STRING: u8 = 0;
     pub const NUMBER: u8 = 1;
