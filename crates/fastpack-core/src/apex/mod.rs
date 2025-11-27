@@ -14,7 +14,7 @@ mod dictionary;
 mod encoder;
 mod delta;
 
-pub use tokenizer::{Token, Tokenizer};
+pub use tokenizer::{Token, Tokenizer, is_json};
 pub use template::{Template, TemplateExtractor};
 pub use dictionary::{Dictionary, DictionaryLevel};
 pub use encoder::{ApexEncoder, ApexDecoder};

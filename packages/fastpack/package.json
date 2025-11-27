@@ -20,6 +20,11 @@
       "types": "./dist/node.d.ts",
       "import": "./dist/node.mjs",
       "require": "./dist/node.js"
+    },
+    "./apex": {
+      "types": "./dist/apex.d.ts",
+      "import": "./dist/apex.mjs",
+      "require": "./dist/apex.js"
     }
   },
   "files": [

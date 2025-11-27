@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     browser: 'src/browser.ts',
     node: 'src/node.ts',
+    apex: 'src/apex.ts',
   },
   format: ['cjs', 'esm'],
   dts: true,
