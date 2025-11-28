@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLUX Compression Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e0e0e0;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: #00d9ff;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00d9ff 0%, #00ff88 100%);
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      color: #1a1a2e;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    input[type="number"] {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      color: #fff;
+      width: 120px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .stat {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #00ff88;
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 0.25rem;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .comparison-item {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .comparison-item h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: #00d9ff;
+    }
+
+    .bar-container {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      height: 24px;
+      margin: 0.5rem 0;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .bar.original { background: #666; }
+    .bar.gzip { background: linear-gradient(90deg, #ff6b6b, #ffa500); }
+    .bar.flux { background: linear-gradient(90deg, #00d9ff, #00ff88); }
+
+    .log {
+      background: #0a0a0a;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.85rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      margin: 0.25rem 0;
+      padding: 0.25rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-entry.success { color: #00ff88; }
+    .log-entry.info { color: #00d9ff; }
+    .log-entry.warn { color: #ffa500; }
+    .log-entry.error { color: #ff6b6b; }
+
+    .status {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      margin-left: 1rem;
+    }
+
+    .status.loading {
+      background: rgba(255, 165, 0, 0.2);
+      color: #ffa500;
+    }
+
+    .status.ready {
+      background: rgba(0, 255, 136, 0.2);
+      color: #00ff88;
+    }
+
+    .status.error {
+      background: rgba(255, 107, 107, 0.2);
+      color: #ff6b6b;
+    }
+
+    @media (max-width: 600px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>FLUX</h1>
+    <p class="subtitle">High-performance JSON compression for the web</p>
+
+    <!-- Status Card -->
+    <div class="card">
+      <h2>
+        WASM Module
+        <span id="wasm-status" class="status loading">Loading...</span>
+      </h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="wasm-size">--</div>
+          <div class="stat-label">WASM Size</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="load-time">--</div>
+          <div class="stat-label">Load Time</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compression Test -->
+    <div class="card">
+      <h2>Compression Test</h2>
+      <div class="controls">
+        <input type="number" id="record-count" value="100" min="10" max="1000" />
+        <button id="btn-test" disabled>Run Compression Test</button>
+      </div>
+
+      <div class="comparison">
+        <div class="comparison-item">
+          <h3>Size Comparison</h3>
+          <div>
+            <div class="bar-container">
+              <div class="bar original" id="bar-original" style="width: 100%">Original</div>
+            </div>
+            <div class="bar-container">
+              <div class="bar gzip" id="bar-gzip" style="width: 0%">gzip</div>
+            </div>
+            <div class="bar-container">
+              <div class="bar flux" id="bar-flux" style="width: 0%">FLUX</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comparison-item">
+          <h3>Results</h3>
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-value" id="result-original">--</div>
+              <div class="stat-label">Original</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="result-gzip">--</div>
+              <div class="stat-label">gzip</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value" id="result-flux">--</div>
+              <div class="stat-label">FLUX</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats" style="margin-top: 1rem;">
+        <div class="stat">
+          <div class="stat-value" id="speed-compress">--</div>
+          <div class="stat-label">Compress Time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="speed-decompress">--</div>
+          <div class="stat-label">Decompress Time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="speed-ratio">--</div>
+          <div class="stat-label">Compression Ratio</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live API Demo -->
+    <div class="card">
+      <h2>Live API Demo</h2>
+      <div class="controls">
+        <button id="btn-fetch">Fetch from Server</button>
+        <button id="btn-fetch-large">Fetch Large Dataset</button>
+      </div>
+      <div class="log" id="log">
+        <div class="log-entry info">Ready to test...</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Import FLUX WASM
+    import init, { compress, decompress } from '/pkg/flux_wasm.js';
+
+    const log = (msg, type = 'info') => {
+      const logEl = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    const formatBytes = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    // Initialize WASM
+    async function initWasm() {
+      const statusEl = document.getElementById('wasm-status');
+      const startTime = performance.now();
+
+      try {
+        await init('/pkg/flux_wasm_bg.wasm');
+        const loadTime = performance.now() - startTime;
+
+        statusEl.textContent = 'Ready';
+        statusEl.className = 'status ready';
+        document.getElementById('load-time').textContent = loadTime.toFixed(0) + 'ms';
+        document.getElementById('btn-test').disabled = false;
+
+        // Get WASM size
+        const response = await fetch('/pkg/flux_wasm_bg.wasm');
+        const wasmSize = response.headers.get('content-length');
+        document.getElementById('wasm-size').textContent = formatBytes(parseInt(wasmSize) || 256000);
+
+        log('WASM module loaded successfully', 'success');
+        return true;
+      } catch (err) {
+        statusEl.textContent = 'Error';
+        statusEl.className = 'status error';
+        log(`Failed to load WASM: ${err.message}`, 'error');
+        return false;
+      }
+    }
+
+    // Compression test
+    async function runCompressionTest() {
+      const count = parseInt(document.getElementById('record-count').value) || 100;
+      log(`Starting compression test with ${count} records...`);
+
+      // Generate test data
+      const data = {
+        users: Array.from({ length: count }, (_, i) => ({
+          id: i + 1,
+          uuid: `550e8400-e29b-41d4-a716-${String(i).padStart(12, '0')}`,
+          name: `User ${i + 1}`,
+          email: `user${i + 1}@example.com`,
+          created: new Date(Date.now() - i * 86400000).toISOString(),
+          role: ['admin', 'user', 'moderator', 'guest'][i % 4],
+          score: Math.floor(Math.random() * 1000),
+          active: i % 3 !== 0
+        })),
+        metadata: { total: count, timestamp: new Date().toISOString() }
+      };
+
+      const jsonStr = JSON.stringify(data);
+      const jsonBytes = new TextEncoder().encode(jsonStr);
+      const originalSize = jsonBytes.length;
+
+      log(`Original size: ${formatBytes(originalSize)}`);
+
+      // FLUX compression
+      const compressStart = performance.now();
+      const compressed = compress(jsonBytes);
+      const compressTime = performance.now() - compressStart;
+
+      const decompressStart = performance.now();
+      const decompressed = decompress(compressed);
+      const decompressTime = performance.now() - decompressStart;
+
+      const fluxSize = compressed.length;
+      const fluxRatio = (fluxSize / originalSize * 100).toFixed(1);
+
+      log(`FLUX: ${formatBytes(fluxSize)} (${fluxRatio}%) - Compress: ${compressTime.toFixed(2)}ms, Decompress: ${decompressTime.toFixed(2)}ms`, 'success');
+
+      // Verify roundtrip
+      const decompressedStr = new TextDecoder().decode(decompressed);
+      if (decompressedStr === jsonStr) {
+        log('Roundtrip verification: OK', 'success');
+      } else {
+        log('Roundtrip verification: FAILED', 'error');
+      }
+
+      // Fetch gzip comparison from server
+      try {
+        const gzipResponse = await fetch(`/api/users/large?count=${count}`, {
+          headers: { 'Accept-Encoding': 'gzip' }
+        });
+        const gzipSize = parseInt(gzipResponse.headers.get('X-Compressed-Size') || '0');
+        const gzipRatio = gzipResponse.headers.get('X-Compression-Ratio') || '--';
+
+        log(`gzip: ${formatBytes(gzipSize)} (${gzipRatio})`, 'info');
+
+        // Update UI
+        document.getElementById('result-original').textContent = formatBytes(originalSize);
+        document.getElementById('result-gzip').textContent = formatBytes(gzipSize);
+        document.getElementById('result-flux').textContent = formatBytes(fluxSize);
+
+        document.getElementById('bar-original').style.width = '100%';
+        document.getElementById('bar-gzip').style.width = (gzipSize / originalSize * 100) + '%';
+        document.getElementById('bar-gzip').textContent = `gzip ${gzipRatio}`;
+        document.getElementById('bar-flux').style.width = (fluxSize / originalSize * 100) + '%';
+        document.getElementById('bar-flux').textContent = `FLUX ${fluxRatio}%`;
+
+      } catch (err) {
+        log(`Could not fetch gzip comparison: ${err.message}`, 'warn');
+      }
+
+      document.getElementById('speed-compress').textContent = compressTime.toFixed(2) + 'ms';
+      document.getElementById('speed-decompress').textContent = decompressTime.toFixed(2) + 'ms';
+      document.getElementById('speed-ratio').textContent = fluxRatio + '%';
+    }
+
+    // Fetch from server
+    async function fetchFromServer(large = false) {
+      const endpoint = large ? '/api/users/large?count=500' : '/api/users';
+      log(`Fetching ${endpoint}...`);
+
+      const start = performance.now();
+      const response = await fetch(endpoint);
+      const data = await response.json();
+      const fetchTime = performance.now() - start;
+
+      const originalSize = parseInt(response.headers.get('X-Original-Size') || '0');
+      log(`Received ${Object.keys(data).length} keys in ${fetchTime.toFixed(0)}ms`, 'success');
+
+      if (originalSize) {
+        log(`Server reports original size: ${formatBytes(originalSize)}`, 'info');
+      }
+
+      // Compress with FLUX
+      const jsonBytes = new TextEncoder().encode(JSON.stringify(data));
+      const compressed = compress(jsonBytes);
+      const ratio = (compressed.length / jsonBytes.length * 100).toFixed(1);
+
+      log(`FLUX would compress to: ${formatBytes(compressed.length)} (${ratio}%)`, 'success');
+    }
+
+    // Event listeners
+    document.getElementById('btn-test').addEventListener('click', runCompressionTest);
+    document.getElementById('btn-fetch').addEventListener('click', () => fetchFromServer(false));
+    document.getElementById('btn-fetch-large').addEventListener('click', () => fetchFromServer(true));
+
+    // Initialize
+    initWasm();
+  </script>
+</body>
+</html>
