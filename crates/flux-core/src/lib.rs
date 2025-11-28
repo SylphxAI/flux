@@ -32,6 +32,7 @@ pub mod frame;
 pub mod schema;
 pub mod encoding;
 pub mod columnar;
+pub mod lz;
 pub mod entropy;
 pub mod delta;
 
@@ -164,17 +165,25 @@ impl FluxSession {
         // Encode data
         let encoded = self.encoder.encode(&value, &schema)?;
 
-        // Apply entropy compression if enabled
+        // Apply LZ compression first (handles repeated sequences)
+        let lz_result = lz::lz_compress(&encoded)?;
+        let after_lz = if lz_result.len() < encoded.len() {
+            lz_result
+        } else {
+            encoded
+        };
+
+        // Then apply entropy compression (handles frequency distribution)
         let (payload, entropy_applied) = if self.config.entropy {
-            let compressed = entropy::fse_compress(&encoded)?;
+            let compressed = entropy::fse_compress(&after_lz)?;
             // Only use entropy if it actually helps
-            if compressed.len() < encoded.len() {
+            if compressed.len() < after_lz.len() {
                 (compressed, true)
             } else {
-                (encoded, false)
+                (after_lz, false)
             }
         } else {
-            (encoded, false)
+            (after_lz, false)
         };
 
         // Build frame
@@ -259,10 +268,17 @@ impl FluxSession {
 
         // Get payload and decompress entropy if needed
         let payload = &input[pos..];
-        let decoded_payload = if header.flags.contains(FrameFlags::FSE_COMPRESSED) {
+        let after_entropy = if header.flags.contains(FrameFlags::FSE_COMPRESSED) {
             entropy::fse_decompress(payload)?
         } else {
             payload.to_vec()
+        };
+
+        // Decompress LZ if it was applied (check for LZ magic)
+        let decoded_payload = if !after_entropy.is_empty() && after_entropy[0] == 0x4C {
+            lz::lz_decompress(&after_entropy)?
+        } else {
+            after_entropy
         };
 
         // Decode data
