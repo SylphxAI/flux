@@ -5,6 +5,7 @@ members = [
     "crates/fastpack-wasm",
     "crates/fastpack-node",
     "crates/flux-core",
+    "crates/flux-wasm",
 ]
 
 [workspace.package]
