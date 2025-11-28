@@ -164,8 +164,21 @@ impl FluxSession {
         // Encode data
         let encoded = self.encoder.encode(&value, &schema)?;
 
+        // Apply entropy compression if enabled
+        let (payload, entropy_applied) = if self.config.entropy {
+            let compressed = entropy::fse_compress(&encoded)?;
+            // Only use entropy if it actually helps
+            if compressed.len() < encoded.len() {
+                (compressed, true)
+            } else {
+                (encoded, false)
+            }
+        } else {
+            (encoded, false)
+        };
+
         // Build frame
-        let mut output = Vec::with_capacity(encoded.len() + 32);
+        let mut output = Vec::with_capacity(payload.len() + 32);
         let mut writer = FrameWriter::new();
 
         let mut flags = FrameFlags::empty();
@@ -175,6 +188,9 @@ impl FluxSession {
         if self.config.columnar {
             flags |= FrameFlags::COLUMNAR;
         }
+        if entropy_applied {
+            flags |= FrameFlags::FSE_COMPRESSED;
+        }
         if self.config.checksum {
             flags |= FrameFlags::CHECKSUM_PRESENT;
         }
@@ -183,7 +199,7 @@ impl FluxSession {
             version: FLUX_VERSION,
             flags,
             schema_id,
-            payload_len: encoded.len() as u32,
+            payload_len: payload.len() as u32,
             checksum: None, // Computed by writer
         };
 
@@ -195,7 +211,7 @@ impl FluxSession {
             output.extend_from_slice(&schema_bytes);
         }
 
-        output.extend_from_slice(&encoded);
+        output.extend_from_slice(&payload);
 
         if self.config.checksum {
             let checksum = crc32c::crc32c(&output[FLUX_MAGIC.len()..]);
@@ -241,9 +257,16 @@ impl FluxSession {
                 .clone()
         };
 
-        // Decode data
+        // Get payload and decompress entropy if needed
         let payload = &input[pos..];
-        let value = self.encoder.decode(payload, &schema)?;
+        let decoded_payload = if header.flags.contains(FrameFlags::FSE_COMPRESSED) {
+            entropy::fse_decompress(payload)?
+        } else {
+            payload.to_vec()
+        };
+
+        // Decode data
+        let value = self.encoder.decode(&decoded_payload, &schema)?;
 
         // Serialize back to JSON
         let output = serde_json::to_vec(&value)
