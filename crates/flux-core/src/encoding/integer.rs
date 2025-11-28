@@ -153,7 +153,7 @@ pub fn encode_for(values: &[i64], buf: &mut Vec<u8>) {
             }
 
             bit_pos += 1;
-            if bit_pos % 8 == 0 {
+            if bit_pos.is_multiple_of(8) {
                 buf.push(current_byte);
                 current_byte = 0;
             }
@@ -161,7 +161,7 @@ pub fn encode_for(values: &[i64], buf: &mut Vec<u8>) {
     }
 
     // Flush remaining bits
-    if bit_pos % 8 != 0 {
+    if !bit_pos.is_multiple_of(8) {
         buf.push(current_byte);
     }
 }

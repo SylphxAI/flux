@@ -238,7 +238,7 @@ impl FluxSession {
             return Err(Error::InvalidFrame("Frame too short".into()));
         }
 
-        if &input[0..4] != &FLUX_MAGIC {
+        if input[0..4] != FLUX_MAGIC {
             return Err(Error::InvalidMagic);
         }
 

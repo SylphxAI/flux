@@ -287,14 +287,14 @@ fn encode_integers_optimal(values: &[i64]) -> Result<(Vec<u8>, ColumnEncoding)> 
                     current_byte |= 1 << (bit_pos % 8);
                 }
                 bit_pos += 1;
-                if bit_pos % 8 == 0 {
+                if bit_pos.is_multiple_of(8) {
                     buf.push(current_byte);
                     current_byte = 0;
                 }
             }
         }
 
-        if bit_pos % 8 != 0 {
+        if !bit_pos.is_multiple_of(8) {
             buf.push(current_byte);
         }
 
@@ -468,11 +468,10 @@ fn decode_column(
                 for bit in 0..bits {
                     let byte_idx = (bit_pos / 8) as usize;
                     let bit_idx = bit_pos % 8;
-                    if byte_idx < data.len() - pos {
-                        if (data[pos + byte_idx] >> bit_idx) & 1 == 1 {
+                    if byte_idx < data.len() - pos
+                        && (data[pos + byte_idx] >> bit_idx) & 1 == 1 {
                             offset |= 1 << bit;
                         }
-                    }
                     bit_pos += 1;
                 }
                 values.push(serde_json::Value::Number((min + offset as i64).into()));

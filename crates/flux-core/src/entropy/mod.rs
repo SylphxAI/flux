@@ -76,7 +76,7 @@ pub fn fse_compress(input: &[u8]) -> Result<Vec<u8>> {
     }
 
     // Build output
-    let mut output = Vec::with_capacity(6 + symbols.len() + (nibbles.len() + 1) / 2);
+    let mut output = Vec::with_capacity(6 + symbols.len() + nibbles.len().div_ceil(2));
     output.push(ENTROPY_MAGIC);
     output.extend_from_slice(&(input.len() as u32).to_le_bytes());
     output.push(FLAG_NIBBLE_ENCODED);

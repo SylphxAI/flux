@@ -1,79 +1,158 @@
-# FastPack
+# FLUX
 
-High-performance compression library for client-server communication. Built with Rust + WebAssembly + TypeScript.
+High-performance JSON compression library optimized for API communication. Built with Rust + WebAssembly + TypeScript.
+
+## Performance
+
+| Metric | FLUX | gzip | zstd |
+|--------|------|------|------|
+| **Compression ratio** | 14.3% | 13.3% | 7.5% |
+| **Decompression speed** | 374 GiB/s | 847 MiB/s | 1.3 GiB/s |
+| **Speed vs gzip** | **450x faster** | 1x | 1.5x |
+
+### Delta Streaming
+| Metric | Value |
+|--------|-------|
+| Full JSON | 4510 bytes |
+| Delta total | 565 bytes |
+| **Savings** | **87.5%** |
 
 ## Features
 
-- 🚀 **Fast** - LZ4-style compression, 2-5x faster than gzip
-- 📦 **Small** - ~25KB WASM bundle (gzipped)
-- 🌐 **Universal** - Works in Browser and Node.js
-- 🔄 **Streaming** - Support for streaming compression/decompression
-- 🔧 **TypeScript** - Full type support
+- **Schema Elimination** - Automatically infers and caches JSON schemas
+- **LZ77 Compression** - Handles repeated byte sequences
+- **ANS Entropy Coding** - Modern entropy coder for frequency optimization
+- **Delta Streaming** - Only transmit changes between states
+- **Binary Timestamps** - ISO 8601 → 8-byte epoch (11 bytes saved per field)
+- **Binary UUIDs** - 36-char string → 16 bytes
 
 ## Installation
 
 ```bash
-npm install fastpack
+npm install @sylphx/flux
 ```
 
 ## Usage
 
-### Basic
+### Basic Compression
 
 ```typescript
-import { compress, decompress } from 'fastpack';
+import { compress, decompress } from '@sylphx/flux';
+
+const json = JSON.stringify({ id: 1, name: "Alice", email: "alice@example.com" });
+const data = new TextEncoder().encode(json);
 
 // Compress
-const data = new TextEncoder().encode('Hello, World!');
-const compressed = await compress(data);
+const compressed = compress(data);
+console.log(`${data.length} -> ${compressed.length} bytes`);
 
 // Decompress
-const original = await decompress(compressed);
-console.log(new TextDecoder().decode(original)); // "Hello, World!"
+const original = decompress(compressed);
 ```
 
-### With Options
+### Session-based (Schema Caching)
 
 ```typescript
-const compressed = await compress(data, {
-  level: 1,      // 0=none, 1=fast (default), 2=better
-  checksum: true // Enable checksum validation
-});
+import { FluxSession } from '@sylphx/flux';
+
+const session = new FluxSession();
+
+// First message - schema included
+const c1 = session.compress('{"id": 1, "name": "Alice"}');
+
+// Second message - schema cached, smaller output
+const c2 = session.compress('{"id": 2, "name": "Bob"}');
 ```
 
-### Streaming (Browser)
+### Delta Streaming
 
 ```typescript
-const response = await fetch('/api/data');
-const stream = response.body
-  .pipeThrough(await createDecompressStream());
+import { FluxStreamSession } from '@sylphx/flux';
+
+const sender = new FluxStreamSession();
+const receiver = new FluxStreamSession();
+
+// Send state updates (only changes transmitted)
+const delta1 = sender.update('{"count": 0, "users": []}');
+const delta2 = sender.update('{"count": 1, "users": ["alice"]}');
+
+// Receive and reconstruct
+const state = receiver.receive(delta2);
 ```
 
-### Streaming (Node.js)
+## Architecture
 
-```typescript
-import { createDecompressStream } from 'fastpack/node';
-
-res.pipe(createDecompressStream()).pipe(outputStream);
+```
+┌────────────────────────────────────────────────────────────────┐
+│                      TypeScript API                            │
+│         compress() / decompress() / FluxSession()              │
+├────────────────────────────────────────────────────────────────┤
+│                     WASM Bindings                              │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │    Schema    │  │     LZ77     │  │     ANS      │         │
+│  │  Inference   │  │ Compression  │  │   Entropy    │         │
+│  └──────────────┘  └──────────────┘  └──────────────┘         │
+│                                                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │   Columnar   │  │    Delta     │  │    Binary    │         │
+│  │  Transform   │  │   Encoding   │  │   Encoding   │         │
+│  └──────────────┘  └──────────────┘  └──────────────┘         │
+│                                                                │
+│                      Rust Core (flux-core)                     │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-## Performance
+## Frame Format
 
-Benchmark results (100KB JSON payload):
+```
+┌──────────┬─────────┬───────┬───────────┬─────────────┬──────────┐
+│  Magic   │ Version │ Flags │ Schema ID │   Payload   │ Checksum │
+│  "FLUX"  │ 1 byte  │ 1 byte│  4 bytes  │   N bytes   │  4 bytes │
+└──────────┴─────────┴───────┴───────────┴─────────────┴──────────┘
+```
 
-| Metric | FastPack | gzip |
-|--------|----------|------|
-| Compress time | 0.38ms | 0.47ms |
-| Decompress time | 0.12ms | 0.08ms |
-| Compression ratio | 74% | 84% |
+### Flags
+- `SCHEMA_INCLUDED` - Schema definition in payload
+- `COLUMNAR` - Columnar data transformation applied
+- `FSE_COMPRESSED` - ANS entropy coding applied
+- `CHECKSUM_PRESENT` - CRC32C checksum appended
 
-FastPack is **1.2-4.5x faster** at compression while achieving ~74% compression ratio (vs ~84% for gzip).
+## Compression Pipeline
+
+```
+Input JSON
+    │
+    ▼
+┌─────────────────┐
+│ Schema Inference│ ← Detect types, timestamps, UUIDs
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Type Encoding   │ ← Binary encoding per type
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ LZ77 Compression│ ← Match repeated sequences
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ ANS Entropy     │ ← Frequency-based symbol encoding
+└────────┬────────┘
+         │
+         ▼
+   Compressed Output
+```
 
 ## Development
 
 ### Prerequisites
 
-- Rust (with wasm32-unknown-unknown target)
+- Rust 1.70+ (with `wasm32-unknown-unknown` target)
 - Node.js 18+
 - wasm-pack
 
@@ -81,53 +160,49 @@ FastPack is **1.2-4.5x faster** at compression while achieving ~74% compression 
 
 ```bash
 # Build everything
-npm run build
+cargo build --release
 
-# Build WASM only
-npm run build:wasm
+# Build WASM
+cd crates/flux-wasm && wasm-pack build --target web
 
-# Build TypeScript only
-npm run build:ts
-```
-
-### Test
-
-```bash
-# Rust tests
+# Run tests
 cargo test
 
-# TypeScript tests
-npm test
-
-# Run benchmark
-npx tsx examples/benchmark.ts
+# Run benchmarks
+cargo bench --bench compression
 ```
 
-## Architecture
+### Project Structure
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   TypeScript API                     │
-│    compress() / decompress() / createStream()       │
-├─────────────────────────────────────────────────────┤
-│              Platform Detection Layer               │
-├────────────────────────┬────────────────────────────┤
-│     WASM (Browser)     │    Native Addon (Node.js)  │
-├────────────────────────┴────────────────────────────┤
-│                  Rust Core Library                   │
-│         LZ4-style compression algorithm             │
-└─────────────────────────────────────────────────────┘
+├── crates/
+│   ├── flux-core/       # Core compression library
+│   ├── flux-wasm/       # WASM bindings
+│   ├── fastpack/        # LZ4-style compression
+│   └── apex/            # Structural encoding
+├── packages/
+│   └── flux/            # TypeScript API
+└── benches/             # Benchmarks
 ```
 
-## Frame Format
+## Benchmarks
 
-FastPack uses a custom binary frame format:
+Run the full benchmark suite:
 
+```bash
+cargo bench --bench compression
 ```
-┌──────────┬─────────┬───────┬────────────┐
-│ Magic    │ Version │ Flags │ Blocks...  │
-│ "FPCK"   │ 1 byte  │ 1 byte│            │
-└──────────┴─────────┴───────┴────────────┘
+
+Sample output:
+```
+=== Compression Ratios (large JSON: 7901 bytes) ===
+FLUX: 1127 bytes (14.3%)
+gzip: 1049 bytes (13.3%)
+zstd: 595 bytes (7.5%)
+
+=== Delta Compression (10 state updates) ===
+Full JSON total: 4510 bytes
+Delta total: 565 bytes (87.5% savings)
 ```
 
 ## License

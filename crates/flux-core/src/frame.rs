@@ -80,6 +80,7 @@ impl FrameHeader {
 }
 
 /// Frame writer
+#[allow(dead_code)]
 pub struct FrameWriter {
     checksum_enabled: bool,
 }
@@ -135,7 +136,7 @@ impl FrameReader {
             return Err(Error::InvalidFrame("Too short for magic".into()));
         }
 
-        if &buf[0..4] != &FLUX_MAGIC {
+        if buf[0..4] != FLUX_MAGIC {
             return Err(Error::InvalidMagic);
         }
 

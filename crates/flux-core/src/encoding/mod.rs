@@ -11,6 +11,7 @@ use crate::types::{FieldType, IntegerType, FloatType};
 use crate::schema::Schema;
 
 /// Main encoder that orchestrates type-specific encoders
+#[allow(dead_code)]
 pub struct Encoder {
     /// String dictionary for key compression
     key_dict: StringDictionary,
