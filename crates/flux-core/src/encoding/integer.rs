@@ -1,7 +1,7 @@
 //! Integer encoding strategies
 
 use super::varint::{encode_varint, decode_varint, encode_signed_varint};
-use crate::{Error, Result};
+use crate::Result;
 
 /// Integer encoding strategy
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

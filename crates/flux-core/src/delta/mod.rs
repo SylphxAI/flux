@@ -302,9 +302,7 @@ pub fn serialize_delta(delta: &DeltaOp) -> Result<Vec<u8>> {
 
 /// Deserialize delta from bytes
 pub fn deserialize_delta(data: &[u8]) -> Result<DeltaOp> {
-    // For now, use JSON serialization of delta ops
-    // Production would use compact binary format
-    Err(Error::DecodeError("Delta deserialization not yet implemented".into()))
+    serde_json::from_slice(data).map_err(|e| Error::DecodeError(e.to_string()))
 }
 
 #[cfg(test)]
@@ -383,5 +381,53 @@ mod tests {
             DeltaOp::ArrayOps(_) => {}
             _ => panic!("Expected ArrayOps"),
         }
+    }
+
+    #[test]
+    fn test_serialize_deserialize_roundtrip() {
+        let v1 = json!({"count": 0, "items": [1, 2, 3]});
+        let v2 = json!({"count": 5, "items": [1, 2, 3, 4], "new": true});
+
+        let delta = compute_delta(&v1, &v2);
+
+        let serialized = serialize_delta(&delta).unwrap();
+        let deserialized = deserialize_delta(&serialized).unwrap();
+
+        assert_eq!(delta, deserialized);
+
+        // Verify applying the delta produces correct result
+        let reconstructed = apply_delta(&v1, &deserialized).unwrap();
+        assert_eq!(reconstructed, v2);
+    }
+
+    #[test]
+    fn test_delta_size_savings() {
+        // Large object with small change
+        let v1 = json!({
+            "users": [
+                {"id": 1, "name": "Alice", "email": "alice@example.com"},
+                {"id": 2, "name": "Bob", "email": "bob@example.com"},
+                {"id": 3, "name": "Charlie", "email": "charlie@example.com"}
+            ],
+            "total": 3,
+            "page": 1
+        });
+
+        let v2 = json!({
+            "users": [
+                {"id": 1, "name": "Alice", "email": "alice@example.com"},
+                {"id": 2, "name": "Bob", "email": "bob@example.com"},
+                {"id": 3, "name": "Charlie", "email": "charlie@example.com"}
+            ],
+            "total": 3,
+            "page": 2  // Only this changed
+        });
+
+        let full_json = serde_json::to_vec(&v2).unwrap();
+        let delta = compute_delta(&v1, &v2);
+        let delta_bytes = serialize_delta(&delta).unwrap();
+
+        // Delta should be much smaller than full JSON
+        assert!(delta_bytes.len() < full_json.len());
     }
 }

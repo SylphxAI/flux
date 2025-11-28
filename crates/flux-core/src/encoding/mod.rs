@@ -8,7 +8,7 @@ pub use varint::{encode_varint, decode_varint, zigzag_encode, zigzag_decode};
 
 use crate::{Error, Result};
 use crate::types::{FieldType, IntegerType, FloatType};
-use crate::schema::{Schema, FieldDef};
+use crate::schema::Schema;
 
 /// Main encoder that orchestrates type-specific encoders
 pub struct Encoder {

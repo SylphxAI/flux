@@ -40,6 +40,8 @@ pub use error::{Error, Result};
 pub use types::{Value, FieldType};
 pub use frame::{FrameHeader, FrameFlags};
 pub use schema::{Schema, FieldDef, SchemaCache};
+pub use delta::{DeltaOp, DeltaEncoder, DeltaDecoder, ArrayOp, ObjectOp};
+pub use delta::{serialize_delta, deserialize_delta};
 
 use schema::SchemaInferrer;
 use encoding::Encoder;
@@ -278,6 +280,121 @@ impl Default for FluxSession {
     }
 }
 
+/// FLUX streaming session with delta compression
+///
+/// Optimized for real-time state updates where only changes
+/// between states need to be transmitted.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use flux_core::FluxStreamSession;
+///
+/// let mut session = FluxStreamSession::new();
+///
+/// // First state - full transmission
+/// let msg1 = session.update(br#"{"count": 0, "users": ["alice"]}"#)?;
+///
+/// // Second state - only delta transmitted
+/// let msg2 = session.update(br#"{"count": 1, "users": ["alice", "bob"]}"#)?;
+/// // msg2 is much smaller, containing only the changes
+/// ```
+pub struct FluxStreamSession {
+    delta_encoder: DeltaEncoder,
+    delta_decoder: DeltaDecoder,
+    stats: StreamStats,
+}
+
+/// Streaming session statistics
+#[derive(Debug, Clone, Default)]
+pub struct StreamStats {
+    pub updates_sent: u64,
+    pub full_sends: u64,
+    pub delta_sends: u64,
+    pub bytes_full: u64,
+    pub bytes_delta: u64,
+}
+
+impl FluxStreamSession {
+    /// Create new streaming session
+    pub fn new() -> Self {
+        Self {
+            delta_encoder: DeltaEncoder::new(),
+            delta_decoder: DeltaDecoder::new(),
+            stats: StreamStats::default(),
+        }
+    }
+
+    /// Send state update, returning compressed delta
+    pub fn update(&mut self, json: &[u8]) -> Result<Vec<u8>> {
+        let value: serde_json::Value = serde_json::from_slice(json)
+            .map_err(|e| Error::ParseError(e.to_string()))?;
+
+        let delta = self.delta_encoder.encode(&value)?;
+        let serialized = serialize_delta(&delta)?;
+
+        self.stats.updates_sent += 1;
+        match &delta {
+            DeltaOp::Add(_) => {
+                self.stats.full_sends += 1;
+                self.stats.bytes_full += serialized.len() as u64;
+            }
+            _ => {
+                self.stats.delta_sends += 1;
+                self.stats.bytes_delta += serialized.len() as u64;
+            }
+        }
+
+        Ok(serialized)
+    }
+
+    /// Receive delta and reconstruct state
+    pub fn receive(&mut self, data: &[u8]) -> Result<Vec<u8>> {
+        let delta = deserialize_delta(data)?;
+        let value = self.delta_decoder.decode(&delta)?;
+
+        serde_json::to_vec(&value)
+            .map_err(|e| Error::SerializeError(e.to_string()))
+    }
+
+    /// Get streaming statistics
+    pub fn stats(&self) -> &StreamStats {
+        &self.stats
+    }
+
+    /// Calculate delta efficiency (bytes saved / bytes if all were full)
+    pub fn delta_efficiency(&self) -> f64 {
+        let total = self.stats.bytes_full + self.stats.bytes_delta;
+        if total == 0 || self.stats.full_sends == 0 {
+            return 0.0;
+        }
+
+        // Estimate: if all were full sends, bytes would be approximately
+        // (bytes_full / full_sends) * total_sends
+        let avg_full = self.stats.bytes_full as f64 / self.stats.full_sends as f64;
+        let estimated_full = avg_full * self.stats.updates_sent as f64;
+
+        if estimated_full == 0.0 {
+            return 0.0;
+        }
+
+        1.0 - (total as f64 / estimated_full)
+    }
+
+    /// Reset session state
+    pub fn reset(&mut self) {
+        self.delta_encoder.reset();
+        self.delta_decoder.reset();
+        self.stats = StreamStats::default();
+    }
+}
+
+impl Default for FluxStreamSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,5 +432,73 @@ mod tests {
         // Stats should show cache hit
         assert_eq!(session.stats().cache_hits, 1);
         assert_eq!(session.stats().cache_misses, 1);
+    }
+
+    #[test]
+    fn test_stream_session_delta() {
+        let mut sender = FluxStreamSession::new();
+        let mut receiver = FluxStreamSession::new();
+
+        // Simulate state updates
+        let states = [
+            br#"{"count": 0, "items": []}"#.as_slice(),
+            br#"{"count": 1, "items": ["a"]}"#.as_slice(),
+            br#"{"count": 2, "items": ["a", "b"]}"#.as_slice(),
+            br#"{"count": 3, "items": ["a", "b", "c"]}"#.as_slice(),
+        ];
+
+        for state in &states {
+            let delta = sender.update(state).unwrap();
+            let received = receiver.receive(&delta).unwrap();
+
+            // Verify roundtrip produces same JSON (values may be reordered)
+            let original: serde_json::Value = serde_json::from_slice(state).unwrap();
+            let decoded: serde_json::Value = serde_json::from_slice(&received).unwrap();
+            assert_eq!(original, decoded);
+        }
+
+        // Check stats
+        assert_eq!(sender.stats().updates_sent, 4);
+        assert_eq!(sender.stats().full_sends, 1);
+        assert_eq!(sender.stats().delta_sends, 3);
+    }
+
+    #[test]
+    fn test_stream_session_efficiency_large_state() {
+        let mut sender = FluxStreamSession::new();
+
+        // Large state with small changes shows delta efficiency
+        let base = serde_json::json!({
+            "users": (0..100).map(|i| {
+                serde_json::json!({
+                    "id": i,
+                    "name": format!("User {}", i),
+                    "email": format!("user{}@example.com", i)
+                })
+            }).collect::<Vec<_>>(),
+            "page": 1,
+            "total": 100
+        });
+
+        let update = serde_json::json!({
+            "users": (0..100).map(|i| {
+                serde_json::json!({
+                    "id": i,
+                    "name": format!("User {}", i),
+                    "email": format!("user{}@example.com", i)
+                })
+            }).collect::<Vec<_>>(),
+            "page": 2,  // Only this changed
+            "total": 100
+        });
+
+        let base_json = serde_json::to_vec(&base).unwrap();
+        let update_json = serde_json::to_vec(&update).unwrap();
+
+        let _first = sender.update(&base_json).unwrap();
+        let delta = sender.update(&update_json).unwrap();
+
+        // Delta should be significantly smaller than full update
+        assert!(delta.len() < update_json.len());
     }
 }

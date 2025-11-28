@@ -8,8 +8,8 @@
 //! - Run-length encoding for repeated values
 
 use crate::{Error, Result};
-use crate::schema::{Schema, FieldDef};
-use crate::types::{FieldType, IntegerType};
+use crate::schema::Schema;
+use crate::types::FieldType;
 use crate::encoding::{encode_varint, decode_varint, zigzag_encode, zigzag_decode};
 
 /// Columnar block representation

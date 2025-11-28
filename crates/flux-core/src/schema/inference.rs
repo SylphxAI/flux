@@ -163,7 +163,7 @@ impl SchemaInferrer {
     /// Merge two schemas
     fn merge_schemas(existing: &mut Schema, new: &Schema) {
         // Track which fields exist in new schema
-        let new_fields: std::collections::HashSet<&str> =
+        let _new_fields: std::collections::HashSet<&str> =
             new.fields.iter().map(|f| f.name.as_str()).collect();
 
         // Update existing fields
