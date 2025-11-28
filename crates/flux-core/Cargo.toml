@@ -1,0 +1,28 @@
+[package]
+name = "flux-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "FLUX v2 - Fast Lightweight Universal eXchange compression"
+readme = "../../docs/FLUX_DESIGN.md"
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+crc32c = "0.6"
+bitvec = "1.0"
+bitflags = "2.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.0"
+rand = "0.8"
+
+# For comparison benchmarks
+flate2 = "1.0"
+zstd = "0.13"
+
+[[bench]]
+name = "compression"
+harness = false
