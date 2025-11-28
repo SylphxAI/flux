@@ -295,14 +295,388 @@ fn apply_delta(prev: &serde_json::Value, delta: &DeltaOp) -> Result<serde_json::
     }
 }
 
-/// Serialize delta to bytes
+// Binary delta format tags
+const TAG_UNCHANGED: u8 = 0;
+const TAG_ADD: u8 = 1;
+const TAG_REMOVE: u8 = 2;
+const TAG_MODIFY: u8 = 3;
+const TAG_ARRAY_OPS: u8 = 4;
+const TAG_OBJECT_OPS: u8 = 5;
+
+// Array op tags
+const ARRAY_KEEP: u8 = 0;
+const ARRAY_INSERT: u8 = 1;
+const ARRAY_DELETE: u8 = 2;
+const ARRAY_REPLACE: u8 = 3;
+
+// Object op tags
+const OBJ_KEEP: u8 = 0;
+const OBJ_ADD: u8 = 1;
+const OBJ_REMOVE: u8 = 2;
+const OBJ_MODIFY: u8 = 3;
+
+/// Serialize delta to compact binary format
 pub fn serialize_delta(delta: &DeltaOp) -> Result<Vec<u8>> {
-    serde_json::to_vec(delta).map_err(|e| Error::EncodeError(e.to_string()))
+    let mut buf = Vec::new();
+    encode_delta(delta, &mut buf)?;
+    Ok(buf)
 }
 
-/// Deserialize delta from bytes
+/// Deserialize delta from binary format
 pub fn deserialize_delta(data: &[u8]) -> Result<DeltaOp> {
-    serde_json::from_slice(data).map_err(|e| Error::DecodeError(e.to_string()))
+    let mut pos = 0;
+    decode_delta(data, &mut pos)
+}
+
+fn encode_delta(delta: &DeltaOp, buf: &mut Vec<u8>) -> Result<()> {
+    match delta {
+        DeltaOp::Unchanged => {
+            buf.push(TAG_UNCHANGED);
+        }
+        DeltaOp::Add(value) => {
+            buf.push(TAG_ADD);
+            encode_json_value(value, buf)?;
+        }
+        DeltaOp::Remove => {
+            buf.push(TAG_REMOVE);
+        }
+        DeltaOp::Modify(value) => {
+            buf.push(TAG_MODIFY);
+            encode_json_value(value, buf)?;
+        }
+        DeltaOp::ArrayOps(ops) => {
+            buf.push(TAG_ARRAY_OPS);
+            encode_varint(ops.len() as u64, buf);
+            for op in ops {
+                encode_array_op(op, buf)?;
+            }
+        }
+        DeltaOp::ObjectOps(ops) => {
+            buf.push(TAG_OBJECT_OPS);
+            encode_varint(ops.len() as u64, buf);
+            for op in ops {
+                encode_object_op(op, buf)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode_delta(data: &[u8], pos: &mut usize) -> Result<DeltaOp> {
+    if *pos >= data.len() {
+        return Err(Error::DecodeError("Unexpected end of delta data".into()));
+    }
+
+    let tag = data[*pos];
+    *pos += 1;
+
+    match tag {
+        TAG_UNCHANGED => Ok(DeltaOp::Unchanged),
+        TAG_ADD => {
+            let value = decode_json_value(data, pos)?;
+            Ok(DeltaOp::Add(value))
+        }
+        TAG_REMOVE => Ok(DeltaOp::Remove),
+        TAG_MODIFY => {
+            let value = decode_json_value(data, pos)?;
+            Ok(DeltaOp::Modify(value))
+        }
+        TAG_ARRAY_OPS => {
+            let count = decode_varint(data, pos)? as usize;
+            let mut ops = Vec::with_capacity(count);
+            for _ in 0..count {
+                ops.push(decode_array_op(data, pos)?);
+            }
+            Ok(DeltaOp::ArrayOps(ops))
+        }
+        TAG_OBJECT_OPS => {
+            let count = decode_varint(data, pos)? as usize;
+            let mut ops = Vec::with_capacity(count);
+            for _ in 0..count {
+                ops.push(decode_object_op(data, pos)?);
+            }
+            Ok(DeltaOp::ObjectOps(ops))
+        }
+        _ => Err(Error::DecodeError(format!("Unknown delta tag: {}", tag))),
+    }
+}
+
+fn encode_array_op(op: &ArrayOp, buf: &mut Vec<u8>) -> Result<()> {
+    match op {
+        ArrayOp::Keep(n) => {
+            buf.push(ARRAY_KEEP);
+            encode_varint(*n as u64, buf);
+        }
+        ArrayOp::Insert(values) => {
+            buf.push(ARRAY_INSERT);
+            encode_varint(values.len() as u64, buf);
+            for v in values {
+                encode_json_value(v, buf)?;
+            }
+        }
+        ArrayOp::Delete(n) => {
+            buf.push(ARRAY_DELETE);
+            encode_varint(*n as u64, buf);
+        }
+        ArrayOp::Replace(value) => {
+            buf.push(ARRAY_REPLACE);
+            encode_json_value(value, buf)?;
+        }
+    }
+    Ok(())
+}
+
+fn decode_array_op(data: &[u8], pos: &mut usize) -> Result<ArrayOp> {
+    if *pos >= data.len() {
+        return Err(Error::DecodeError("Unexpected end of array op".into()));
+    }
+
+    let tag = data[*pos];
+    *pos += 1;
+
+    match tag {
+        ARRAY_KEEP => {
+            let n = decode_varint(data, pos)? as usize;
+            Ok(ArrayOp::Keep(n))
+        }
+        ARRAY_INSERT => {
+            let count = decode_varint(data, pos)? as usize;
+            let mut values = Vec::with_capacity(count);
+            for _ in 0..count {
+                values.push(decode_json_value(data, pos)?);
+            }
+            Ok(ArrayOp::Insert(values))
+        }
+        ARRAY_DELETE => {
+            let n = decode_varint(data, pos)? as usize;
+            Ok(ArrayOp::Delete(n))
+        }
+        ARRAY_REPLACE => {
+            let value = decode_json_value(data, pos)?;
+            Ok(ArrayOp::Replace(value))
+        }
+        _ => Err(Error::DecodeError(format!("Unknown array op tag: {}", tag))),
+    }
+}
+
+fn encode_object_op(op: &ObjectOp, buf: &mut Vec<u8>) -> Result<()> {
+    match op {
+        ObjectOp::Keep(key) => {
+            buf.push(OBJ_KEEP);
+            encode_string(key, buf);
+        }
+        ObjectOp::Add(key, value) => {
+            buf.push(OBJ_ADD);
+            encode_string(key, buf);
+            encode_json_value(value, buf)?;
+        }
+        ObjectOp::Remove(key) => {
+            buf.push(OBJ_REMOVE);
+            encode_string(key, buf);
+        }
+        ObjectOp::Modify(key, delta) => {
+            buf.push(OBJ_MODIFY);
+            encode_string(key, buf);
+            encode_delta(delta, buf)?;
+        }
+    }
+    Ok(())
+}
+
+fn decode_object_op(data: &[u8], pos: &mut usize) -> Result<ObjectOp> {
+    if *pos >= data.len() {
+        return Err(Error::DecodeError("Unexpected end of object op".into()));
+    }
+
+    let tag = data[*pos];
+    *pos += 1;
+
+    match tag {
+        OBJ_KEEP => {
+            let key = decode_string(data, pos)?;
+            Ok(ObjectOp::Keep(key))
+        }
+        OBJ_ADD => {
+            let key = decode_string(data, pos)?;
+            let value = decode_json_value(data, pos)?;
+            Ok(ObjectOp::Add(key, value))
+        }
+        OBJ_REMOVE => {
+            let key = decode_string(data, pos)?;
+            Ok(ObjectOp::Remove(key))
+        }
+        OBJ_MODIFY => {
+            let key = decode_string(data, pos)?;
+            let delta = decode_delta(data, pos)?;
+            Ok(ObjectOp::Modify(key, Box::new(delta)))
+        }
+        _ => Err(Error::DecodeError(format!("Unknown object op tag: {}", tag))),
+    }
+}
+
+// JSON value encoding (compact binary)
+const JSON_NULL: u8 = 0;
+const JSON_BOOL_FALSE: u8 = 1;
+const JSON_BOOL_TRUE: u8 = 2;
+const JSON_NUMBER_INT: u8 = 3;
+const JSON_NUMBER_FLOAT: u8 = 4;
+const JSON_STRING: u8 = 5;
+const JSON_ARRAY: u8 = 6;
+const JSON_OBJECT: u8 = 7;
+
+fn encode_json_value(value: &serde_json::Value, buf: &mut Vec<u8>) -> Result<()> {
+    use serde_json::Value;
+    match value {
+        Value::Null => buf.push(JSON_NULL),
+        Value::Bool(false) => buf.push(JSON_BOOL_FALSE),
+        Value::Bool(true) => buf.push(JSON_BOOL_TRUE),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                buf.push(JSON_NUMBER_INT);
+                encode_signed_varint(i, buf);
+            } else if let Some(f) = n.as_f64() {
+                buf.push(JSON_NUMBER_FLOAT);
+                buf.extend_from_slice(&f.to_le_bytes());
+            } else {
+                return Err(Error::EncodeError("Unsupported number type".into()));
+            }
+        }
+        Value::String(s) => {
+            buf.push(JSON_STRING);
+            encode_string(s, buf);
+        }
+        Value::Array(arr) => {
+            buf.push(JSON_ARRAY);
+            encode_varint(arr.len() as u64, buf);
+            for item in arr {
+                encode_json_value(item, buf)?;
+            }
+        }
+        Value::Object(obj) => {
+            buf.push(JSON_OBJECT);
+            encode_varint(obj.len() as u64, buf);
+            for (k, v) in obj {
+                encode_string(k, buf);
+                encode_json_value(v, buf)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode_json_value(data: &[u8], pos: &mut usize) -> Result<serde_json::Value> {
+    use serde_json::Value;
+
+    if *pos >= data.len() {
+        return Err(Error::DecodeError("Unexpected end of JSON value".into()));
+    }
+
+    let tag = data[*pos];
+    *pos += 1;
+
+    match tag {
+        JSON_NULL => Ok(Value::Null),
+        JSON_BOOL_FALSE => Ok(Value::Bool(false)),
+        JSON_BOOL_TRUE => Ok(Value::Bool(true)),
+        JSON_NUMBER_INT => {
+            let i = decode_signed_varint(data, pos)?;
+            Ok(Value::Number(i.into()))
+        }
+        JSON_NUMBER_FLOAT => {
+            if *pos + 8 > data.len() {
+                return Err(Error::DecodeError("Truncated float".into()));
+            }
+            let f = f64::from_le_bytes([
+                data[*pos], data[*pos + 1], data[*pos + 2], data[*pos + 3],
+                data[*pos + 4], data[*pos + 5], data[*pos + 6], data[*pos + 7],
+            ]);
+            *pos += 8;
+            Ok(serde_json::Number::from_f64(f)
+                .map(Value::Number)
+                .unwrap_or(Value::Null))
+        }
+        JSON_STRING => {
+            let s = decode_string(data, pos)?;
+            Ok(Value::String(s))
+        }
+        JSON_ARRAY => {
+            let count = decode_varint(data, pos)? as usize;
+            let mut arr = Vec::with_capacity(count);
+            for _ in 0..count {
+                arr.push(decode_json_value(data, pos)?);
+            }
+            Ok(Value::Array(arr))
+        }
+        JSON_OBJECT => {
+            let count = decode_varint(data, pos)? as usize;
+            let mut obj = serde_json::Map::with_capacity(count);
+            for _ in 0..count {
+                let k = decode_string(data, pos)?;
+                let v = decode_json_value(data, pos)?;
+                obj.insert(k, v);
+            }
+            Ok(Value::Object(obj))
+        }
+        _ => Err(Error::DecodeError(format!("Unknown JSON tag: {}", tag))),
+    }
+}
+
+fn encode_string(s: &str, buf: &mut Vec<u8>) {
+    encode_varint(s.len() as u64, buf);
+    buf.extend_from_slice(s.as_bytes());
+}
+
+fn decode_string(data: &[u8], pos: &mut usize) -> Result<String> {
+    let len = decode_varint(data, pos)? as usize;
+    if *pos + len > data.len() {
+        return Err(Error::DecodeError("Truncated string".into()));
+    }
+    let s = String::from_utf8(data[*pos..*pos + len].to_vec())
+        .map_err(|_| Error::DecodeError("Invalid UTF-8".into()))?;
+    *pos += len;
+    Ok(s)
+}
+
+fn encode_varint(mut value: u64, buf: &mut Vec<u8>) {
+    while value >= 0x80 {
+        buf.push((value as u8 & 0x7F) | 0x80);
+        value >>= 7;
+    }
+    buf.push(value as u8);
+}
+
+fn decode_varint(data: &[u8], pos: &mut usize) -> Result<u64> {
+    let mut result: u64 = 0;
+    let mut shift = 0;
+
+    loop {
+        if *pos >= data.len() {
+            return Err(Error::DecodeError("Varint truncated".into()));
+        }
+        let byte = data[*pos];
+        *pos += 1;
+        result |= ((byte & 0x7F) as u64) << shift;
+        if byte & 0x80 == 0 {
+            break;
+        }
+        shift += 7;
+        if shift > 63 {
+            return Err(Error::DecodeError("Varint too long".into()));
+        }
+    }
+    Ok(result)
+}
+
+fn encode_signed_varint(value: i64, buf: &mut Vec<u8>) {
+    // Zigzag encoding
+    let encoded = ((value << 1) ^ (value >> 63)) as u64;
+    encode_varint(encoded, buf);
+}
+
+fn decode_signed_varint(data: &[u8], pos: &mut usize) -> Result<i64> {
+    let encoded = decode_varint(data, pos)?;
+    // Zigzag decoding
+    Ok(((encoded >> 1) as i64) ^ (-((encoded & 1) as i64)))
 }
 
 #[cfg(test)]

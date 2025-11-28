@@ -173,9 +173,16 @@ impl Encoder {
             }
 
             (serde_json::Value::String(s), FieldType::Timestamp) => {
-                // Store as string for now (could optimize to u64 millis)
-                encode_varint(s.len() as u64, buf);
-                buf.extend_from_slice(s.as_bytes());
+                // Parse ISO 8601 timestamp to epoch milliseconds (8 bytes)
+                if let Some(millis) = parse_iso8601_to_millis(s) {
+                    buf.push(0x01); // Binary timestamp flag
+                    buf.extend_from_slice(&millis.to_le_bytes());
+                } else {
+                    // Fallback to string storage
+                    buf.push(0x00); // String flag
+                    encode_varint(s.len() as u64, buf);
+                    buf.extend_from_slice(s.as_bytes());
+                }
             }
 
             (serde_json::Value::String(s), FieldType::Uuid) => {
@@ -380,7 +387,7 @@ impl Encoder {
                     .ok_or_else(|| Error::DecodeError("Invalid float".into()))
             }
 
-            FieldType::String | FieldType::Timestamp => {
+            FieldType::String => {
                 let (len, bytes_read) = decode_varint(&data[*pos..])?;
                 *pos += bytes_read;
 
@@ -392,6 +399,40 @@ impl Encoder {
                     .map_err(|e| Error::DecodeError(e.to_string()))?;
                 *pos += len as usize;
                 Ok(serde_json::Value::String(s.to_string()))
+            }
+
+            FieldType::Timestamp => {
+                if *pos >= data.len() {
+                    return Err(Error::DecodeError("Timestamp truncated".into()));
+                }
+                let flag = data[*pos];
+                *pos += 1;
+
+                if flag == 0x01 {
+                    // Binary timestamp (epoch millis)
+                    if *pos + 8 > data.len() {
+                        return Err(Error::DecodeError("Timestamp truncated".into()));
+                    }
+                    let millis = i64::from_le_bytes([
+                        data[*pos], data[*pos + 1], data[*pos + 2], data[*pos + 3],
+                        data[*pos + 4], data[*pos + 5], data[*pos + 6], data[*pos + 7]
+                    ]);
+                    *pos += 8;
+                    Ok(serde_json::Value::String(millis_to_iso8601(millis)))
+                } else {
+                    // String fallback
+                    let (len, bytes_read) = decode_varint(&data[*pos..])?;
+                    *pos += bytes_read;
+
+                    if *pos + len as usize > data.len() {
+                        return Err(Error::DecodeError("Timestamp string truncated".into()));
+                    }
+
+                    let s = std::str::from_utf8(&data[*pos..*pos + len as usize])
+                        .map_err(|e| Error::DecodeError(e.to_string()))?;
+                    *pos += len as usize;
+                    Ok(serde_json::Value::String(s.to_string()))
+                }
             }
 
             FieldType::Uuid => {
@@ -487,6 +528,112 @@ impl Default for Encoder {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Parse ISO 8601 timestamp to epoch milliseconds
+/// Supports: 2024-01-15T10:30:00Z, 2024-01-15T10:30:00.123Z, 2024-01-15
+fn parse_iso8601_to_millis(s: &str) -> Option<i64> {
+    // Full datetime with optional milliseconds: 2024-01-15T10:30:00Z or 2024-01-15T10:30:00.123Z
+    if s.len() >= 20 && s.contains('T') && s.ends_with('Z') {
+        let parts: Vec<&str> = s.trim_end_matches('Z').split('T').collect();
+        if parts.len() == 2 {
+            let date_parts: Vec<i32> = parts[0]
+                .split('-')
+                .filter_map(|p| p.parse().ok())
+                .collect();
+
+            // Handle time with optional milliseconds
+            let time_str = parts[1];
+            let (time_parts, millis) = if time_str.contains('.') {
+                let tp: Vec<&str> = time_str.split('.').collect();
+                let ms: i64 = tp.get(1).and_then(|m| m.parse().ok()).unwrap_or(0);
+                (tp[0], ms)
+            } else {
+                (time_str, 0i64)
+            };
+
+            let time_nums: Vec<i32> = time_parts
+                .split(':')
+                .filter_map(|p| p.parse().ok())
+                .collect();
+
+            if date_parts.len() == 3 && time_nums.len() == 3 {
+                let year = date_parts[0];
+                let month = date_parts[1];
+                let day = date_parts[2];
+                let hour = time_nums[0];
+                let minute = time_nums[1];
+                let second = time_nums[2];
+
+                // Calculate days since epoch (1970-01-01)
+                let days = days_since_epoch(year, month, day);
+                let seconds = days as i64 * 86400 + hour as i64 * 3600 + minute as i64 * 60 + second as i64;
+                return Some(seconds * 1000 + millis);
+            }
+        }
+    }
+
+    // Date only: 2024-01-15
+    if s.len() == 10 && s.chars().filter(|c| *c == '-').count() == 2 {
+        let parts: Vec<i32> = s.split('-').filter_map(|p| p.parse().ok()).collect();
+        if parts.len() == 3 {
+            let days = days_since_epoch(parts[0], parts[1], parts[2]);
+            return Some(days as i64 * 86400 * 1000);
+        }
+    }
+
+    None
+}
+
+/// Convert epoch milliseconds to ISO 8601 string
+fn millis_to_iso8601(millis: i64) -> String {
+    let total_seconds = millis / 1000;
+    let ms = (millis % 1000) as u32;
+
+    let days = (total_seconds / 86400) as i32;
+    let remaining = (total_seconds % 86400) as i32;
+
+    let hour = remaining / 3600;
+    let minute = (remaining % 3600) / 60;
+    let second = remaining % 60;
+
+    let (year, month, day) = days_to_ymd(days);
+
+    if ms > 0 {
+        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+            year, month, day, hour, minute, second, ms)
+    } else {
+        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+            year, month, day, hour, minute, second)
+    }
+}
+
+/// Calculate days since Unix epoch (1970-01-01)
+/// Uses Howard Hinnant's algorithm from chrono
+fn days_since_epoch(year: i32, month: i32, day: i32) -> i32 {
+    let y = if month <= 2 { year - 1 } else { year };
+    let m = if month <= 2 { month + 12 } else { month };
+    let era = if y >= 0 { y / 400 } else { (y - 399) / 400 };
+    let yoe = y - era * 400;
+    let doy = (153 * (m - 3) + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
+/// Convert days since epoch to year, month, day
+/// Uses Howard Hinnant's algorithm from chrono
+fn days_to_ymd(days: i32) -> (i32, i32, i32) {
+    let z = days + 719468;
+    let era = if z >= 0 { z / 146097 } else { (z - 146096) / 146097 };
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = y + if m <= 2 { 1 } else { 0 };
+    (year, m, d)
 }
 
 #[cfg(test)]
@@ -610,5 +757,34 @@ mod tests {
         assert!(encoded.len() < json_bytes.len(),
             "Encoded ({}) should be smaller than JSON ({})",
             encoded.len(), json_bytes.len());
+    }
+
+    #[test]
+    fn test_timestamp_parsing() {
+        // Full datetime
+        let millis = parse_iso8601_to_millis("2024-01-15T10:30:00Z").unwrap();
+        assert!(millis > 0);
+        let back = millis_to_iso8601(millis);
+        assert_eq!(back, "2024-01-15T10:30:00Z");
+
+        // With milliseconds
+        let millis = parse_iso8601_to_millis("2024-01-15T10:30:00.123Z").unwrap();
+        let back = millis_to_iso8601(millis);
+        assert_eq!(back, "2024-01-15T10:30:00.123Z");
+
+        // Date only
+        let millis = parse_iso8601_to_millis("2024-01-15").unwrap();
+        assert!(millis > 0);
+    }
+
+    #[test]
+    fn test_timestamp_size_savings() {
+        // Timestamp string: "2024-01-15T10:30:00Z" = 20 bytes
+        // Binary encoding: 1 flag + 8 bytes = 9 bytes
+        // Savings: 11 bytes per timestamp
+        let timestamp = "2024-01-15T10:30:00Z";
+        assert!(parse_iso8601_to_millis(timestamp).is_some());
+
+        // With 10 timestamps, save 110 bytes
     }
 }
