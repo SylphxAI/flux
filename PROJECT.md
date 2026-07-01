@@ -54,5 +54,7 @@ internals or alter core behavior for a single application.
   not declared yet
 - Recovery class: `forward-fix-only`
 
+Release safety: `packages/flux` is marked private until this repo declares a package release path and replaces generated/non-npm `workspace:` dependencies with publishable artifacts.
+
 Adoption is baseline only. The current gaps are tracked in
 `.doctrine/project.json`.
