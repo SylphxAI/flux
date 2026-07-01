@@ -47,5 +47,9 @@
   },
   "peerDependencies": {
     "flux-wasm": "*"
+  },
+  "private": true,
+  "publishConfig": {
+    "private": true
   }
 }
