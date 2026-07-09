@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Rust-first authority gate for SylphxAI/flux Phase 1 pilot.
+# Proof: cargo test --workspace + TS packages are WASM/native loaders only.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+echo "==> Rust parity proof: cargo test --workspace"
+cargo test --workspace
+
+echo "==> Verify no TS backend authority in package surfaces"
+BACKEND_MARKERS=(
+  'from ["'\'']hono'
+  'from ["'\'']@trpc'
+  'new Hono\('
+  'McpServer'
+  'stdio.*transport'
+)
+for marker in "${BACKEND_MARKERS[@]}"; do
+  if rg -q "$marker" packages/ 2>/dev/null; then
+    echo "FAIL: TS backend marker found in packages/: $marker"
+    exit 1
+  fi
+done
+
+echo "==> Verify TS compression surfaces delegate to Rust/WASM/native bindings"
+LOADER_SURFACES=(
+  packages/flux/src/index.ts
+  packages/fastpack/src/browser.ts
+  packages/fastpack/src/node.ts
+  packages/fastpack/src/apex.ts
+)
+for surface in "${LOADER_SURFACES[@]}"; do
+  if ! rg -q 'wasm\.|wasmModule|nativeAddon|flux-wasm|fastpack_wasm' "$surface"; then
+    echo "FAIL: $surface does not delegate to Rust/WASM/native surface"
+    exit 1
+  fi
+done
+
+echo "OK: Rust authority verified; TS packages are WASM/native loaders only"
