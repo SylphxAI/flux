@@ -1,0 +1,162 @@
+# Flux core compress/session/stream WASM↔Rust differential parity (rej-010).
+# Adopts rust-parity-drift-pass control-plane template: map-and-stale + differential + fan-in.
+name: rust-parity-differential
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+concurrency:
+  group: rust-parity-differential-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  map-and-stale:
+    name: rust-parity-drift-pass/map-and-stale
+    runs-on: sylphx-linux-standard
+    timeout-minutes: 5
+    outputs:
+      stale_capabilities: ${{ steps.map.outputs.stale }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Map changed files to capabilities
+        id: map
+        env:
+          MANIFEST: docs/specs/flux-core-parity-slice.json
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          CHANGED="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" 2>/dev/null || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" || true)"
+          export CHANGED
+          # Heredoc is program stdin; pass CHANGED via env (<<< + << cannot share stdin).
+          python3 - "$MANIFEST" <<'PY'
+          import json, sys, fnmatch, os
+          manifest = sys.argv[1]
+          changed = [l.strip() for l in os.environ.get("CHANGED", "").splitlines() if l.strip()]
+          data = json.load(open(manifest))
+          caps = list(data.get("capabilities") or [])
+          stale = []
+          for cap in caps:
+              globs = (cap.get("proof") or {}).get("dependencyGlobs") or cap.get("dependencyGlobs") or []
+              for g in globs:
+                  if any(fnmatch.fnmatch(c, g) for c in changed):
+                      stale.append(cap["id"])
+                      break
+          stale_json = json.dumps(sorted(set(stale)))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"stale={stale_json}\n")
+          print(f"stale capabilities: {stale_json}")
+          PY
+
+  differential:
+    name: rust-parity-drift-pass/differential
+    needs: map-and-stale
+    # Prefer standard: sylphx-linux-large has 0 online capacity; JIT admits standard.
+    runs-on: sylphx-linux-standard
+    timeout-minutes: 30
+    env:
+      # PR head (not merge commit) so proof binds to candidate branch tip.
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+      # runner context is step-only — do NOT use runner.temp in job-level env
+      # (Invalid workflow / 0 jobs). Fixed path matches script default.
+      SCRATCH_DIR: /tmp/flux-differential
+      DIFFERENTIAL_SCRIPT: scripts/run-flux-differential.sh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        # Must run AFTER rust toolchain; cargo was not on PATH previously.
+        run: |
+          set -euo pipefail
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
+          wasm-pack --version
+
+      - name: Run differential harness
+        run: bash "${DIFFERENTIAL_SCRIPT}"
+
+      - name: Assert proof SHA binding
+        run: |
+          set -euo pipefail
+          ARTIFACT="${SCRATCH_DIR}/verification.json"
+          if [ ! -f "$ARTIFACT" ]; then
+            echo "::error::verification artifact missing at $ARTIFACT"
+            exit 1
+          fi
+          LAST_COMPARED="$(jq -r '.lastComparedMainSha' "$ARTIFACT")"
+          STATUS="$(jq -r '.status' "$ARTIFACT")"
+          if [ "$STATUS" != "differential_green" ]; then
+            echo "::error::verification status must be differential_green (got $STATUS)"
+            exit 1
+          fi
+          if [ "$LAST_COMPARED" != "$CANDIDATE_SHA" ]; then
+            echo "::error::proof SHA binding failed: lastComparedMainSha=$LAST_COMPARED candidate=$CANDIDATE_SHA"
+            exit 1
+          fi
+          echo "proof SHA binding OK: lastComparedMainSha=$LAST_COMPARED"
+
+      - name: Warn on stale capabilities without re-proof
+        if: needs.map-and-stale.outputs.stale_capabilities != '[]'
+        run: |
+          echo "::warning::Stale capabilities detected — differential must pass before merge"
+          echo "${{ needs.map-and-stale.outputs.stale_capabilities }}"
+
+      - name: Upload verification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flux-differential-${{ env.CANDIDATE_SHA }}
+          path: |
+            ${{ env.SCRATCH_DIR }}/verification.json
+            ${{ env.SCRATCH_DIR }}/differential.log
+            ${{ env.SCRATCH_DIR }}/oracle.json
+          if-no-files-found: error
+
+  rust-parity-drift-pass:
+    name: rust-parity-drift-pass/pass
+    runs-on: sylphx-linux-standard
+    timeout-minutes: 5
+    needs:
+      - map-and-stale
+      - differential
+    if: ${{ always() }}
+
+    steps:
+      - name: Evaluate rust-parity-drift-pass fan-in
+        env:
+          MAP_AND_STALE_RESULT: ${{ needs.map-and-stale.result }}
+          DIFFERENTIAL_RESULT: ${{ needs.differential.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          if [ "$MAP_AND_STALE_RESULT" != "success" ]; then failed=1; fi
+          if [ "$DIFFERENTIAL_RESULT" != "success" ]; then failed=1; fi
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::rust-parity-drift-pass failed — differential parity not proven at candidate SHA"
+            exit 1
+          fi

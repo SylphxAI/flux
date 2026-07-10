@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 2,
+  "repo": "SylphxAI/flux",
+  "rejectionRef": "rej-010",
+  "slice": "flux-core.compress|flux-core.session|flux-core.stream",
+  "differentialHarness": "scripts/run-flux-differential.sh",
+  "limitations": [
+    {
+      "id": "compress-decompress-roundtrip-incomplete",
+      "scope": "flux-core.compress",
+      "status": "incomplete",
+      "reason": "One-shot decompress roundtrip not proven at bound SHA — encoder parity via compressedHex only",
+      "trackedIn": "crates/flux-core/tests/flux_core_differential.rs#compare_compress_case"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "core/flux-compress-decompress",
+      "state": "authority_rust",
+      "differentialTest": "crates/flux-core/tests/flux_core_differential.rs#flux_core_differential_matches_wasm_oracle",
+      "proof": {
+        "status": "missing",
+        "staleReason": "rej-010: differential harness landed — awaiting differential_green at bound SHAs",
+        "verificationRef": "verification/flux-differential-green.json",
+        "dependencyGlobs": [
+          "crates/flux-core/**",
+          "crates/flux-wasm/**",
+          "packages/flux-wasm/**",
+          "packages/flux/src/**",
+          "scripts/differential/**",
+          "scripts/run-flux-differential.sh"
+        ]
+      }
+    },
+    {
+      "id": "core/flux-session-schema-cache",
+      "state": "authority_rust",
+      "differentialTest": "crates/flux-core/tests/flux_core_differential.rs#flux_core_differential_matches_wasm_oracle",
+      "proof": {
+        "status": "missing",
+        "staleReason": "rej-010: differential harness landed — awaiting differential_green at bound SHAs",
+        "verificationRef": "verification/flux-differential-green.json",
+        "dependencyGlobs": [
+          "crates/flux-core/src/schema/**",
+          "crates/flux-wasm/**",
+          "packages/flux/src/index.ts",
+          "scripts/differential/**"
+        ]
+      }
+    },
+    {
+      "id": "core/flux-stream-delta",
+      "state": "authority_rust",
+      "differentialTest": "crates/flux-core/tests/flux_core_differential.rs#flux_core_differential_matches_wasm_oracle",
+      "proof": {
+        "status": "missing",
+        "staleReason": "rej-010: differential harness landed — awaiting differential_green at bound SHAs",
+        "verificationRef": "verification/flux-differential-green.json",
+        "dependencyGlobs": [
+          "crates/flux-core/src/delta/**",
+          "crates/flux-wasm/**",
+          "packages/flux/src/index.ts",
+          "scripts/differential/**"
+        ]
+      }
+    }
+  ],
+  "notes": "CI parity slice manifest for flux-core bounded differential gate (rej-010). Compress/session prove encoder parity; stream proves full delta roundtrip. Does not promote fleet ledger state or claim fleet complete."
+}
