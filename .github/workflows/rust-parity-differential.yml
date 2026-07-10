@@ -86,11 +86,17 @@ jobs:
       - name: Install jq
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
 
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        # Must run AFTER rust toolchain; cargo was not on PATH previously.
+        run: |
+          set -euo pipefail
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
+          wasm-pack --version
 
       - name: Run differential harness
         run: bash "${DIFFERENTIAL_SCRIPT}"
