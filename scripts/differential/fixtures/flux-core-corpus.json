@@ -1,0 +1,58 @@
+{
+  "corpusVersion": 1,
+  "slice": "flux-core.compress|flux-core.session|flux-core.stream",
+  "cases": [
+    {
+      "id": "compress-simple",
+      "slice": "flux-core.compress",
+      "domain": "compression",
+      "input": {
+        "json": "{\"id\": 123, \"name\": \"test\"}"
+      }
+    },
+    {
+      "id": "compress-null-edge",
+      "slice": "flux-core.compress",
+      "domain": "compression",
+      "input": {
+        "json": "{\"id\": 1, \"name\": null, \"active\": true, \"tags\": []}"
+      }
+    },
+    {
+      "id": "session-schema-cache",
+      "slice": "flux-core.session",
+      "domain": "compression",
+      "input": {
+        "messages": [
+          "{\"id\": 1, \"name\": \"alice\", \"role\": \"admin\"}",
+          "{\"id\": 2, \"name\": \"bob\", \"role\": \"user\"}",
+          "{\"id\": 3, \"name\": \"carol\", \"role\": \"user\"}"
+        ]
+      }
+    },
+    {
+      "id": "stream-delta-sequence",
+      "slice": "flux-core.stream",
+      "domain": "compression",
+      "input": {
+        "states": [
+          "{\"count\": 0, \"items\": []}",
+          "{\"count\": 1, \"items\": [\"a\"]}",
+          "{\"count\": 2, \"items\": [\"a\", \"b\"]}",
+          "{\"count\": 3, \"items\": [\"a\", \"b\", \"c\"]}"
+        ]
+      }
+    },
+    {
+      "id": "stream-delta-page-flip",
+      "slice": "flux-core.stream",
+      "domain": "compression",
+      "input": {
+        "states": [
+          "{\"users\": [{\"id\": 0, \"name\": \"User 0\"}, {\"id\": 1, \"name\": \"User 1\"}], \"page\": 1, \"total\": 2}",
+          "{\"users\": [{\"id\": 0, \"name\": \"User 0\"}, {\"id\": 1, \"name\": \"User 1\"}], \"page\": 2, \"total\": 2}"
+        ]
+      }
+    }
+  ]
+}
