@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 3,
+  "repo": "SylphxAI/flux",
+  "repoLedgerPath": "docs/specs/migration-ledger.json",
+  "lockedAt": "2026-07-10T21:30:00Z",
+  "programSpec": {
+    "id": "rust-first-fleet-migration",
+    "controlPlaneRepo": "SylphxAI/rust-first-fleet-control-plane",
+    "programSpecPath": "PROGRAM-SPEC.json",
+    "completionStandard": "COMPLETION-STANDARD.md",
+    "parityStandard": "PARITY-VERIFICATION-STANDARD.md"
+  },
+  "adrRefs": [
+    {
+      "path": "docs/adr/ADR-PROPOSED-fleet-flux-rust-north-star.md",
+      "status": "proposed",
+      "note": "pending \u2014 ADR number will equal introducing PR per Doctrine"
+    }
+  ],
+  "inventorySource": [
+    "manual"
+  ],
+  "reauditRef": "rej-010",
+  "verificationRef": "verification/flux-cycle80-differential-green.json",
+  "inScopeBoundary": {
+    "includeGlobs": [
+      "crates/flux-core/**",
+      "crates/flux-wasm/**",
+      "crates/fastpack-core/**",
+      "crates/fastpack-wasm/**",
+      "crates/fastpack-node/**",
+      "packages/flux/**",
+      "packages/flux-wasm/**",
+      "packages/fastpack/**",
+      "docs/FLUX_SPEC.md",
+      "examples/**"
+    ],
+    "excludeGlobs": [
+      "packages/**/test/**",
+      "examples/benchmark.ts",
+      "node_modules/**",
+      ".claude/**"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "core/flux-compress-decompress",
+      "domain": "compression",
+      "weight": 5,
+      "state": "authority_rust",
+      "rustSurface": "crates/flux-core/src/lib.rs",
+      "tsSurface": "packages/flux/src/index.ts (WASM loader only)",
+      "parityTest": "cargo test --workspace; crates/flux-core tests::test_compress_decompress_simple",
+      "differentialTest": "crates/flux-core/tests/flux_core_differential.rs",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: differential_green at bound SHAs \u2014 promotion_hold until prod_audit_pass",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "differential_green",
+        "baselineTsSha": "",
+        "rustCandidateSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "lastComparedMainSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "mergeGroupSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "behaviorSpecHash": "da1889c20a37f6f9abbd8e7a0535b264c80a5b36c448584c7a089c9eb6fdfc03",
+        "fixtureCorpusHash": "c5f904ab25bcbfd7eb9695d924f9834b34c69f39e8272fa16725777d1e025e02",
+        "verifiedAt": "2026-07-10T10:39:25+00:00",
+        "verificationRef": "verification/flux-cycle80-differential-green.json",
+        "dependencyGlobs": [
+          "crates/flux-core/**",
+          "crates/flux-wasm/**",
+          "packages/flux-wasm/**",
+          "packages/flux/src/**",
+          "scripts/differential/**",
+          "scripts/run-flux-differential.sh"
+        ]
+      },
+      "notes": "Downgraded ts_deleted\u2192authority_rust per rej-010. Rust owns frame format and codec; TS npm package is thin WASM FFI. Differential proves flux-wasm consumer matches native SSOT on compress/decompress slice."
+    },
+    {
+      "id": "core/flux-session-schema-cache",
+      "domain": "compression",
+      "weight": 5,
+      "state": "authority_rust",
+      "rustSurface": "crates/flux-core/src/schema/",
+      "tsSurface": "packages/flux/src/index.ts#FluxSession",
+      "parityTest": "cargo test --workspace; crates/flux-core tests::test_session_schema_caching",
+      "differentialTest": "crates/flux-core/tests/flux_core_differential.rs",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: differential_green at bound SHAs \u2014 promotion_hold until prod_audit_pass",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "differential_green",
+        "baselineTsSha": "",
+        "rustCandidateSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "lastComparedMainSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "mergeGroupSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "behaviorSpecHash": "da1889c20a37f6f9abbd8e7a0535b264c80a5b36c448584c7a089c9eb6fdfc03",
+        "fixtureCorpusHash": "c5f904ab25bcbfd7eb9695d924f9834b34c69f39e8272fa16725777d1e025e02",
+        "verifiedAt": "2026-07-10T10:39:25+00:00",
+        "verificationRef": "verification/flux-cycle80-differential-green.json",
+        "dependencyGlobs": [
+          "crates/flux-core/src/schema/**",
+          "crates/flux-wasm/**",
+          "packages/flux/src/index.ts",
+          "scripts/differential/**"
+        ]
+      },
+      "notes": "Session schema cache authority is Rust; FluxSession TS class delegates to WASM exports only."
+    },
+    {
+      "id": "core/flux-stream-delta",
+      "domain": "compression",
+      "weight": 5,
+      "state": "authority_rust",
+      "rustSurface": "crates/flux-core/src/delta/",
+      "tsSurface": "packages/flux/src/index.ts#FluxStream",
+      "parityTest": "cargo test --workspace; crates/flux-core tests::test_stream_session_delta; tests::test_stream_session_efficiency_large_state",
+      "differentialTest": "crates/flux-core/tests/flux_core_differential.rs",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: differential_green at bound SHAs \u2014 promotion_hold until prod_audit_pass",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "differential_green",
+        "baselineTsSha": "",
+        "rustCandidateSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "lastComparedMainSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "mergeGroupSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
+        "behaviorSpecHash": "da1889c20a37f6f9abbd8e7a0535b264c80a5b36c448584c7a089c9eb6fdfc03",
+        "fixtureCorpusHash": "c5f904ab25bcbfd7eb9695d924f9834b34c69f39e8272fa16725777d1e025e02",
+        "verifiedAt": "2026-07-10T10:39:25+00:00",
+        "verificationRef": "verification/flux-cycle80-differential-green.json",
+        "dependencyGlobs": [
+          "crates/flux-core/src/delta/**",
+          "crates/flux-wasm/**",
+          "packages/flux/src/index.ts",
+          "scripts/differential/**"
+        ]
+      },
+      "notes": "Streaming delta compression authority is Rust; FluxStream TS wrapper delegates to WASM exports only."
+    },
+    {
+      "id": "core/fastpack-compression",
+      "domain": "compression",
+      "weight": 4,
+      "state": "rust_impl",
+      "rustSurface": "crates/fastpack-core/src/",
+      "tsSurface": "packages/fastpack/src/",
+      "parityTest": "cargo test --workspace; crates/fastpack-core tests (apex, compress, decompress, frame)",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: no differential harness in flux-core slice \u2014 gate-only proof",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "missing",
+        "dependencyGlobs": [
+          "crates/fastpack-core/**",
+          "crates/fastpack-wasm/**",
+          "packages/fastpack/src/**"
+        ],
+        "staleReason": "rej-010 re-audit \u2014 prior ts_deleted lacked differential proof; fastpack oracle pending",
+        "verificationRef": "scripts/run-flux-differential.sh"
+      },
+      "notes": "FastPack apex/dictionary codec in Rust; TS/browser packages load WASM or native bindings only. Differential harness for fastpack slice pending."
+    },
+    {
+      "id": "bindings/flux-wasm",
+      "domain": "bindings",
+      "weight": 4,
+      "state": "rust_impl",
+      "rustSurface": "crates/flux-wasm/src/lib.rs",
+      "parityTest": "cargo test --workspace; crates/flux-wasm compiles and links via wasm-bindgen",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: FFI/WASM smoke only \u2014 covered indirectly by flux-core differential",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "missing",
+        "dependencyGlobs": [
+          "crates/flux-wasm/**",
+          "packages/flux-wasm/**"
+        ],
+        "staleReason": "rej-010 re-audit \u2014 prior ts_deleted lacked SHA-bound differential proof",
+        "verificationRef": "scripts/run-flux-differential.sh"
+      },
+      "notes": "wasm-bindgen surface for browser/Node WASM consumers; no parallel TS implementation."
+    },
+    {
+      "id": "bindings/fastpack-wasm-node",
+      "domain": "bindings",
+      "weight": 4,
+      "state": "rust_impl",
+      "rustSurface": "crates/fastpack-wasm/src/lib.rs; crates/fastpack-node/src/lib.rs",
+      "parityTest": "cargo test --workspace; crates/fastpack-wasm + fastpack-node compile and link",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: no differential harness \u2014 NAPI/WASM FFI smoke only",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "missing",
+        "dependencyGlobs": [
+          "crates/fastpack-wasm/**",
+          "crates/fastpack-node/**"
+        ],
+        "staleReason": "rej-010 re-audit \u2014 prior ts_deleted lacked differential proof",
+        "verificationRef": "scripts/check-rust-authority.sh"
+      },
+      "notes": "WASM + napi-rs native bindings; no parallel TS implementation."
+    },
+    {
+      "id": "bindings/npm-flux-distribution",
+      "domain": "distribution",
+      "weight": 3,
+      "state": "rust_impl",
+      "tsSurface": "packages/flux/package.json; packages/flux/src/index.ts",
+      "rustSurface": "crates/flux-wasm/",
+      "parityTest": "scripts/check-rust-authority.sh; packages/flux/src/index.ts delegates exclusively to flux-wasm exports",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: gate-only proof \u2014 loader surface, no codec authority",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "missing",
+        "dependencyGlobs": [
+          "packages/flux/**",
+          "packages/flux-wasm/**"
+        ],
+        "staleReason": "rej-010 re-audit \u2014 prior ts_deleted lacked differential proof",
+        "verificationRef": "scripts/check-rust-authority.sh"
+      },
+      "notes": "Package marked private pending publish path; TS is distribution/loader only per PROJECT.md."
+    },
+    {
+      "id": "bindings/npm-fastpack-distribution",
+      "domain": "distribution",
+      "weight": 2,
+      "state": "rust_impl",
+      "tsSurface": "packages/fastpack/package.json; packages/fastpack/src/",
+      "rustSurface": "crates/fastpack-wasm/; crates/fastpack-node/",
+      "parityTest": "scripts/check-rust-authority.sh; packages/fastpack/src/{browser,node,apex}.ts delegate to WASM/native",
+      "prodProbe": "scripts/check-rust-authority.sh",
+      "promotionHold": {
+        "active": true,
+        "reason": "rej-010: gate-only proof \u2014 loader surface, no codec authority",
+        "rejectionRef": "rej-010",
+        "since": "2026-07-10T21:30:00Z"
+      },
+      "proof": {
+        "status": "missing",
+        "dependencyGlobs": [
+          "packages/fastpack/**"
+        ],
+        "staleReason": "rej-010 re-audit \u2014 prior ts_deleted lacked differential proof",
+        "verificationRef": "scripts/check-rust-authority.sh"
+      },
+      "notes": "Public npm surfaces delegate to Rust-backed WASM/native artifacts; no TS codec authority."
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "ts_only": 0,
+    "contracted": 0,
+    "rust_impl": 5,
+    "parity_proven": 0,
+    "authority_rust": 3,
+    "ts_deleted": 0,
+    "proof_stale": 0,
+    "proof_missing": 5,
+    "completion_progress": 0,
+    "authority_progress": 0.375,
+    "verified_authority_progress": 0,
+    "weighted_progress": 0.46875,
+    "summaryNote": "rej-010/rej-011 \u2014 differential_green recorded for pilot harness slice; promotion_hold until prod_audit_pass",
+    "cycle50_delta": {
+      "rust_impl_verified": 1,
+      "slice": "flux-core",
+      "verificationRef": "verification/flux-cycle50-flux-core-rust-impl.json",
+      "notes": "rej-010 rust_impl ONLY \u2014 cycle50 highest-value unimplemented slice: flux-core bounded differential (5 compress/decompress/session/delta cases)"
+    }
+  },
+  "priorClaims": {
+    "ts_deleted": 8,
+    "completion_progress": 1.0,
+    "authority_progress": 1.0,
+    "revertedAt": "2026-07-10T21:30:00Z",
+    "reason": "rej-010 promotion freeze \u2014 0 capabilities with differential_green or canary_green proof"
+  },
+  "rej010Reaudit": {
+    "appliedAt": "2026-07-10T21:30:00Z",
+    "harness": "scripts/run-flux-differential.sh",
+    "differentialTest": "crates/flux-core/tests/flux_core_differential.rs",
+    "oracle": "scripts/differential/flux-core-oracle.ts",
+    "capabilitiesDowngraded": 8,
+    "capabilitiesWithDifferentialHarness": 3
+  },
+  "cycle46Slice": "flux-core \u2014 WASM oracle vs native Rust SSOT; bash scripts/run-flux-differential.sh",
+  "cycle46": {
+    "boundedSlice": "flux-core",
+    "status": "rust_impl_on_disk_verified",
+    "reauditRef": "rej-010",
+    "verificationRef": "verification/flux-cycle46-core-rust-impl.json",
+    "deliverables": [
+      "scripts/run-flux-differential.sh",
+      "crates/flux-core/tests/flux_core_differential.rs",
+      "scripts/differential/flux-core-oracle.ts",
+      "scripts/differential/fixtures/flux-core-corpus.json",
+      "docs/specs/flux-core-parity-slice.json"
+    ],
+    "caseCounts": {
+      "total": 5
+    },
+    "notes": "cycle46 pilot/P0 rej-010: FLUX core differential harness on-disk re-verify. rust_impl ONLY \u2014 proof.status missing until differential_green."
+  },
+  "cycle50Slice": "flux-core \u2014 WASM oracle vs native Rust SSOT; bash scripts/run-flux-differential.sh",
+  "cycle50": {
+    "boundedSlice": "flux-core",
+    "status": "rust_impl_on_disk_verified",
+    "reauditRef": "rej-010",
+    "verificationRef": "verification/flux-cycle50-flux-core-rust-impl.json",
+    "harnessPath": "scripts/run-flux-differential.sh",
+    "deliverables": [
+      "scripts/run-flux-differential.sh",
+      "crates/flux-core/tests/flux_core_differential.rs",
+      "scripts/differential/flux-core-oracle.ts",
+      "scripts/differential/fixtures/flux-core-corpus.json",
+      "docs/specs/flux-core-parity-slice.json"
+    ],
+    "caseCounts": {
+      "total": 5
+    },
+    "notes": "cycle50 rej-010: flux-core bounded differential harness on-disk verify. rust_impl ONLY \u2014 proof.status missing until differential_green at bound SHAs."
+  },
+  "cycle80Slice": "flux-core.compress|flux-core.session|flux-core.stream",
+  "cycle80": {
+    "boundedSlice": "flux-core",
+    "status": "differential_green",
+    "reauditRef": "rej-010",
+    "verificationRef": "verification/flux-cycle80-differential-green.json",
+    "harnessPath": "scripts/run-flux-differential.sh",
+    "notes": "cycle80 pilot harness executed \u2014 differential_green at bound SHAs; promotion_hold until prod_audit_pass"
+  }
+}
