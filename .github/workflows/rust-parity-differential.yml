@@ -57,11 +57,15 @@ jobs:
   differential:
     name: rust-parity-drift-pass/differential
     needs: map-and-stale
-    runs-on: sylphx-linux-large
+    # Prefer standard: sylphx-linux-large has 0 online capacity; JIT admits standard.
+    runs-on: sylphx-linux-standard
     timeout-minutes: 30
     env:
-      CANDIDATE_SHA: ${{ github.event.merge_group.head_sha || github.sha }}
-      SCRATCH_DIR: ${{ runner.temp }}/flux-differential
+      # PR head (not merge commit) so proof binds to candidate branch tip.
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+      # runner context is step-only — do NOT use runner.temp in job-level env
+      # (Invalid workflow / 0 jobs). Fixed path matches script default.
+      SCRATCH_DIR: /tmp/flux-differential
       DIFFERENTIAL_SCRIPT: scripts/run-flux-differential.sh
 
     steps:
