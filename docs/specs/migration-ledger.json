@@ -47,7 +47,7 @@
       "id": "core/flux-compress-decompress",
       "domain": "compression",
       "weight": 5,
-      "state": "authority_rust",
+      "state": "rust_impl",
       "rustSurface": "crates/flux-core/src/lib.rs",
       "tsSurface": "packages/flux/src/index.ts (WASM loader only)",
       "parityTest": "cargo test --workspace; crates/flux-core tests::test_compress_decompress_simple",
@@ -55,12 +55,12 @@
       "prodProbe": "scripts/check-rust-authority.sh",
       "promotionHold": {
         "active": true,
-        "reason": "rej-010: differential_green at bound SHAs \u2014 promotion_hold until prod_audit_pass",
+        "reason": "rej-010 promotion freeze \u2014 incomplete differential proof; honesty demoted authority_rust\u2192rust_impl (PROOF-GAP-58-WAVE-TICK026)",
         "rejectionRef": "rej-010",
         "since": "2026-07-10T21:30:00Z"
       },
       "proof": {
-        "status": "differential_green",
+        "status": "stale",
         "baselineTsSha": "",
         "rustCandidateSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
         "lastComparedMainSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
@@ -76,15 +76,16 @@
           "packages/flux/src/**",
           "scripts/differential/**",
           "scripts/run-flux-differential.sh"
-        ]
+        ],
+        "staleReason": "PROOF-GAP-58-WAVE-TICK026 honesty demote: promoted state without valid v2 proof (missing SHA-bound differential_green|caught_up|canary_green fields). Prior state=authority_rust. rej-010."
       },
-      "notes": "Downgraded ts_deleted\u2192authority_rust per rej-010. Rust owns frame format and codec; TS npm package is thin WASM FFI. Differential proves flux-wasm consumer matches native SSOT on compress/decompress slice."
+      "notes": "Downgraded ts_deleted\u2192authority_rust per rej-010. Rust owns frame format and codec; TS npm package is thin WASM FFI. Differential proves flux-wasm consumer matches native SSOT on compress/decompress slice. [PROOF-GAP-58-WAVE-TICK026] honesty demote authority_rust\u2192rust_impl (invalid/missing v2 proof)."
     },
     {
       "id": "core/flux-session-schema-cache",
       "domain": "compression",
       "weight": 5,
-      "state": "authority_rust",
+      "state": "rust_impl",
       "rustSurface": "crates/flux-core/src/schema/",
       "tsSurface": "packages/flux/src/index.ts#FluxSession",
       "parityTest": "cargo test --workspace; crates/flux-core tests::test_session_schema_caching",
@@ -92,12 +93,12 @@
       "prodProbe": "scripts/check-rust-authority.sh",
       "promotionHold": {
         "active": true,
-        "reason": "rej-010: differential_green at bound SHAs \u2014 promotion_hold until prod_audit_pass",
+        "reason": "rej-010 promotion freeze \u2014 incomplete differential proof; honesty demoted authority_rust\u2192rust_impl (PROOF-GAP-58-WAVE-TICK026)",
         "rejectionRef": "rej-010",
         "since": "2026-07-10T21:30:00Z"
       },
       "proof": {
-        "status": "differential_green",
+        "status": "stale",
         "baselineTsSha": "",
         "rustCandidateSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
         "lastComparedMainSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
@@ -111,15 +112,16 @@
           "crates/flux-wasm/**",
           "packages/flux/src/index.ts",
           "scripts/differential/**"
-        ]
+        ],
+        "staleReason": "PROOF-GAP-58-WAVE-TICK026 honesty demote: promoted state without valid v2 proof (missing SHA-bound differential_green|caught_up|canary_green fields). Prior state=authority_rust. rej-010."
       },
-      "notes": "Session schema cache authority is Rust; FluxSession TS class delegates to WASM exports only."
+      "notes": "Session schema cache authority is Rust; FluxSession TS class delegates to WASM exports only. [PROOF-GAP-58-WAVE-TICK026] honesty demote authority_rust\u2192rust_impl (invalid/missing v2 proof)."
     },
     {
       "id": "core/flux-stream-delta",
       "domain": "compression",
       "weight": 5,
-      "state": "authority_rust",
+      "state": "rust_impl",
       "rustSurface": "crates/flux-core/src/delta/",
       "tsSurface": "packages/flux/src/index.ts#FluxStream",
       "parityTest": "cargo test --workspace; crates/flux-core tests::test_stream_session_delta; tests::test_stream_session_efficiency_large_state",
@@ -127,12 +129,12 @@
       "prodProbe": "scripts/check-rust-authority.sh",
       "promotionHold": {
         "active": true,
-        "reason": "rej-010: differential_green at bound SHAs \u2014 promotion_hold until prod_audit_pass",
+        "reason": "rej-010 promotion freeze \u2014 incomplete differential proof; honesty demoted authority_rust\u2192rust_impl (PROOF-GAP-58-WAVE-TICK026)",
         "rejectionRef": "rej-010",
         "since": "2026-07-10T21:30:00Z"
       },
       "proof": {
-        "status": "differential_green",
+        "status": "stale",
         "baselineTsSha": "",
         "rustCandidateSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
         "lastComparedMainSha": "dd21afcc5e1bf1aec546ccc6045b21ad35367286",
@@ -146,9 +148,10 @@
           "crates/flux-wasm/**",
           "packages/flux/src/index.ts",
           "scripts/differential/**"
-        ]
+        ],
+        "staleReason": "PROOF-GAP-58-WAVE-TICK026 honesty demote: promoted state without valid v2 proof (missing SHA-bound differential_green|caught_up|canary_green fields). Prior state=authority_rust. rej-010."
       },
-      "notes": "Streaming delta compression authority is Rust; FluxStream TS wrapper delegates to WASM exports only."
+      "notes": "Streaming delta compression authority is Rust; FluxStream TS wrapper delegates to WASM exports only. [PROOF-GAP-58-WAVE-TICK026] honesty demote authority_rust\u2192rust_impl (invalid/missing v2 proof)."
     },
     {
       "id": "core/fastpack-compression",
@@ -283,11 +286,11 @@
     "total": 8,
     "ts_only": 0,
     "contracted": 0,
-    "rust_impl": 5,
+    "rust_impl": 8,
     "parity_proven": 0,
-    "authority_rust": 3,
+    "authority_rust": 0,
     "ts_deleted": 0,
-    "proof_stale": 0,
+    "proof_stale": 3,
     "proof_missing": 5,
     "completion_progress": 0,
     "authority_progress": 0.375,
@@ -299,7 +302,9 @@
       "slice": "flux-core",
       "verificationRef": "verification/flux-cycle50-flux-core-rust-impl.json",
       "notes": "rej-010 rust_impl ONLY \u2014 cycle50 highest-value unimplemented slice: flux-core bounded differential (5 compress/decompress/session/delta cases)"
-    }
+    },
+    "updatedAt": "2026-07-11T14:04:33Z",
+    "lastMutation": "PROOF-GAP-58-WAVE-TICK026"
   },
   "priorClaims": {
     "ts_deleted": 8,
@@ -361,5 +366,27 @@
     "verificationRef": "verification/flux-cycle80-differential-green.json",
     "harnessPath": "scripts/run-flux-differential.sh",
     "notes": "cycle80 pilot harness executed \u2014 differential_green at bound SHAs; promotion_hold until prod_audit_pass"
+  },
+  "rej010HonestyDemote": {
+    "packetId": "PROOF-GAP-58-WAVE-TICK026",
+    "appliedAt": "2026-07-11T14:04:33Z",
+    "demoted": [
+      {
+        "id": "core/flux-compress-decompress",
+        "from": "authority_rust",
+        "to": "rust_impl"
+      },
+      {
+        "id": "core/flux-session-schema-cache",
+        "from": "authority_rust",
+        "to": "rust_impl"
+      },
+      {
+        "id": "core/flux-stream-delta",
+        "from": "authority_rust",
+        "to": "rust_impl"
+      }
+    ],
+    "policy": "demote incomplete promoted states to rust_impl; no authority_rust/ts_deleted promotions"
   }
 }
