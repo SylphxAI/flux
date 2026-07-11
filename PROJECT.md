@@ -47,14 +47,20 @@ internals or alter core behavior for a single application.
 
 ## Delivery
 
-- CI model: `none`
-- Required contexts: none declared in this repository
-- Deploy/release path: package/crate release path is not declared yet
-- Production proof: benchmark, package publication, and consumer smoke proof are
-  not declared yet
+- CI model: GitHub Actions (`.github/workflows/`)
+- Required contexts: `rust-parity-differential`
+- Deploy/release path: npm packages `@sylphx/flux` + `@sylphx/flux-wasm` via
+  `.github/workflows/release.yml` on `main` (trusted publishing / NPM_TOKEN)
+- Production proof: `scripts/run-flux-differential.sh` main-bound green + npm
+  registry readback (`npm view @sylphx/flux gitHead` == publish commit) +
+  install smoke (`npm pack` / consumer compress roundtrip)
 - Recovery class: `forward-fix-only`
 
-Release safety: `packages/flux` is marked private until this repo declares a package release path and replaces generated/non-npm `workspace:` dependencies with publishable artifacts.
+Release safety: packages are public-scoped (`@sylphx/*`) with versioned
+`@sylphx/flux` → `@sylphx/flux-wasm@0.1.0` dependency (no `workspace:*` on the
+publish surface). First publish still requires org npm credentials or OIDC
+trusted publishing secrets on this repository.
 
-Adoption is baseline only. The current gaps are tracked in
-`.doctrine/project.json`.
+Adoption gaps remaining: registry secrets (actions secrets currently 0), first
+successful publish+readback, and completeness beyond flux-core compress/session/stream.
+Tracked in `.doctrine/project.json`.

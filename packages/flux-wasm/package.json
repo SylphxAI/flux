@@ -1,0 +1,41 @@
+{
+  "name": "@sylphx/flux-wasm",
+  "version": "0.1.0",
+  "description": "FLUX v2 WebAssembly bindings — consumer artifact for @sylphx/flux",
+  "type": "module",
+  "main": "wasm/flux_wasm.js",
+  "module": "wasm/flux_wasm.js",
+  "types": "wasm/flux_wasm.d.ts",
+  "exports": {
+    ".": {
+      "import": "./wasm/flux_wasm.js",
+      "types": "./wasm/flux_wasm.d.ts",
+      "default": "./wasm/flux_wasm.js"
+    }
+  },
+  "files": [
+    "wasm"
+  ],
+  "scripts": {
+    "build": "wasm-pack build ../../crates/flux-wasm --target web --out-dir ../../packages/flux-wasm/wasm --out-name flux_wasm",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "flux",
+    "compression",
+    "wasm",
+    "json"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SylphxAI/flux.git",
+    "directory": "packages/flux-wasm"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "./wasm/flux_wasm.js"
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "name": "fastpack-workspace",
+  "name": "@sylphx/flux-workspace",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -8,7 +8,7 @@
     "build": "npm run build:rust && npm run build:ts",
     "build:rust": "cargo build --release",
     "build:wasm": "wasm-pack build crates/fastpack-wasm --target web --out-dir ../../packages/fastpack/wasm",
-    "build:ts": "npm -w fastpack run build",
+    "build:ts": "npm run build:flux",
     "test": "npm run test:rust && npm run test:ts",
     "test:rust": "cargo test",
     "test:ts": "npm -w fastpack run test",
@@ -16,7 +16,9 @@
     "bench": "cargo bench",
     "lint:fix": "biome check --write .",
     "check:rust-authority": "bash scripts/check-rust-authority.sh",
-    "check:flux-differential": "bash scripts/run-flux-differential.sh"
+    "check:flux-differential": "bash scripts/run-flux-differential.sh",
+    "build:flux-wasm": "npm -w @sylphx/flux-wasm run build",
+    "build:flux": "npm run build:flux-wasm && npm -w @sylphx/flux run build"
   },
   "devDependencies": {
     "wasm-pack": "^0.12.0",

@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { compress, decompress, FluxSession, FluxStream } from 'flux';
+ * import { compress, decompress, FluxSession, FluxStream } from '@sylphx/flux';
  *
  * // One-shot compression
  * const data = JSON.stringify({ id: 1, name: 'test' });
@@ -74,7 +74,7 @@ async function loadWasm(): Promise<FluxWasm> {
 
   wasmLoadPromise = (async () => {
     // @ts-ignore - dynamic import of WASM
-    const wasm = await import('flux-wasm');
+    const wasm = await import('@sylphx/flux-wasm');
     await wasm.default?.();
     wasmModule = wasm as unknown as FluxWasm;
     return wasmModule;

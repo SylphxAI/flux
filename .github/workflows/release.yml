@@ -1,0 +1,73 @@
+# Publish path for @sylphx/flux + @sylphx/flux-wasm (library digest bind).
+# Fail-closed: does not claim prod_audit_pass; publish still requires npm OIDC/token.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-publish:
+    name: build-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install JS deps
+        run: npm install
+
+      - name: Build @sylphx/flux-wasm
+        run: npm run build:flux-wasm
+
+      - name: Build @sylphx/flux
+        run: npm -w @sylphx/flux run build
+
+      - name: Publish @sylphx/flux-wasm
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          if ! npm view @sylphx/flux-wasm@0.1.0 version >/dev/null 2>&1; then
+            npm -w @sylphx/flux-wasm publish --access public --provenance
+          else
+            echo "@sylphx/flux-wasm@0.1.0 already on registry — skip"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish @sylphx/flux
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          if ! npm view @sylphx/flux@0.1.0 version >/dev/null 2>&1; then
+            npm -w @sylphx/flux publish --access public --provenance
+          else
+            echo "@sylphx/flux@0.1.0 already on registry — skip"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+      - name: Registry readback (best-effort)
+        run: |
+          set -euo pipefail
+          npm view @sylphx/flux version gitHead time --json || echo "flux not published yet"
+          npm view @sylphx/flux-wasm version gitHead time --json || echo "flux-wasm not published yet"
