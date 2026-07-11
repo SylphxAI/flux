@@ -97,11 +97,13 @@
     }
   },
   "delivery": {
-    "ciModel": "none",
-    "deployable": false,
-    "requiredContexts": [],
-    "deployPath": "Package and crate release path is not declared in this repository yet.",
-    "productionProof": "No package publication, benchmark freshness, consumer smoke, or release readback proof is declared yet.",
+    "ciModel": "github-actions",
+    "deployable": true,
+    "requiredContexts": [
+      "rust-parity-differential"
+    ],
+    "deployPath": "npm packages @sylphx/flux + @sylphx/flux-wasm via .github/workflows/release.yml on main (OIDC trusted publishing and/or NPM_TOKEN).",
+    "productionProof": "scripts/run-flux-differential.sh main-bound differential_green + npm registry readback (gitHead == publish commit) + install smoke (compress/decompress roundtrip).",
     "recoveryClass": "forward-fix-only"
   },
   "adoption": {
@@ -124,7 +126,8 @@
         "description": "Reconcile README install names and package repository metadata before treating package contracts as fully adopted.",
         "owner": "SylphxAI/flux",
         "target": "Before package publication"
-      }
+      },
+      "npm secrets/OIDC not yet bound on repo (actions secrets=0); first publish+readback pending"
     ]
   }
 }
