@@ -7,15 +7,16 @@
 //! - **LZ4-style**: Fast, general-purpose compression (default)
 //! - **APEX**: Advanced JSON-aware compression with learning capabilities
 
+pub mod apex;
 mod compress;
 mod decompress;
 mod frame;
-pub mod apex;
+pub mod json_surface;
 
+pub use apex::{apex_compress, apex_decompress, ApexOptions, ApexSession};
 pub use compress::{compress, compress_to, Compressor};
 pub use decompress::{decompress, decompress_to, Decompressor};
-pub use frame::{FrameHeader, Flags, MAGIC, VERSION};
-pub use apex::{apex_compress, apex_decompress, ApexSession, ApexOptions};
+pub use frame::{Flags, FrameHeader, MAGIC, VERSION};
 
 /// Compression level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -121,7 +122,10 @@ mod tests {
     #[test]
     fn test_level_none() {
         let data = b"test data";
-        let opts = Options { level: Level::None, checksum: false };
+        let opts = Options {
+            level: Level::None,
+            checksum: false,
+        };
         let compressed = compress(data, &opts).unwrap();
         let decompressed = decompress(&compressed).unwrap();
         assert_eq!(data.as_slice(), decompressed.as_slice());
