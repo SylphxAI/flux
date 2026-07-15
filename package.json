@@ -20,7 +20,9 @@
     "check:flux-pack-integrity": "bash scripts/check-flux-pack-integrity.sh",
     "check:flux-consumer-smoke": "bash scripts/check-flux-consumer-smoke.sh",
     "build:flux-wasm": "npm -w @sylphx/flux-wasm run build",
-    "build:flux": "npm run build:flux-wasm && npm -w @sylphx/flux run build"
+    "build:flux": "npm run build:flux-wasm && npm -w @sylphx/flux run build",
+    "check:pack-integrity": "bash scripts/check-flux-pack-integrity.sh",
+    "test:pack-integrity": "bun test test/packIntegrity.matrix.test.ts"
   },
   "devDependencies": {
     "wasm-pack": "^0.12.0",
