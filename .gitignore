@@ -40,3 +40,4 @@ npm-debug.log*
 # wasm-pack output (built in CI/release)
 packages/flux-wasm/wasm/
 crates/flux-wasm/wasm/
+.pack-integrity-test/
