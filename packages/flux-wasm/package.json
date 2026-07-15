@@ -1,6 +1,6 @@
 {
   "name": "@sylphx/flux-wasm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "FLUX v2 WebAssembly bindings — consumer artifact for @sylphx/flux",
   "type": "module",
   "main": "wasm/flux_wasm.js",
@@ -11,14 +11,18 @@
       "import": "./wasm/flux_wasm.js",
       "types": "./wasm/flux_wasm.d.ts",
       "default": "./wasm/flux_wasm.js"
-    }
+    },
+    "./package.json": "./package.json",
+    "./wasm/*": "./wasm/*"
   },
   "files": [
-    "wasm"
+    "wasm",
+    "package.json"
   ],
   "scripts": {
-    "build": "wasm-pack build ../../crates/flux-wasm --target web --out-dir ../../packages/flux-wasm/wasm --out-name flux_wasm",
-    "prepack": "npm run build"
+    "build": "wasm-pack build ../../crates/flux-wasm --target web --out-dir ./wasm --out-name flux_wasm && rm -f ./wasm/.gitignore && test -s ./wasm/flux_wasm_bg.wasm",
+    "prepack": "npm run build && test -s wasm/flux_wasm_bg.wasm && test -s wasm/flux_wasm.js",
+    "check:pack": "bash ../../scripts/check-flux-pack-integrity.sh"
   },
   "keywords": [
     "flux",

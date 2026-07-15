@@ -17,6 +17,8 @@
     "lint:fix": "biome check --write .",
     "check:rust-authority": "bash scripts/check-rust-authority.sh",
     "check:flux-differential": "bash scripts/run-flux-differential.sh",
+    "check:flux-pack-integrity": "bash scripts/check-flux-pack-integrity.sh",
+    "check:flux-consumer-smoke": "bash scripts/check-flux-consumer-smoke.sh",
     "build:flux-wasm": "npm -w @sylphx/flux-wasm run build",
     "build:flux": "npm run build:flux-wasm && npm -w @sylphx/flux run build"
   },

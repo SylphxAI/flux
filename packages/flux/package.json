@@ -1,6 +1,6 @@
 {
   "name": "@sylphx/flux",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "FLUX v2 - Schema-aware JSON compression for API traffic",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -41,7 +41,7 @@
     "directory": "packages/flux"
   },
   "dependencies": {
-    "@sylphx/flux-wasm": "0.1.0"
+    "@sylphx/flux-wasm": "0.1.1"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

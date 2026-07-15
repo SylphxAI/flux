@@ -61,6 +61,13 @@ Release safety: packages are public-scoped (`@sylphx/*`) with versioned
 publish surface). First publish still requires org npm credentials or OIDC
 trusted publishing secrets on this repository.
 
-Adoption gaps remaining: registry secrets (actions secrets currently 0), first
-successful publish+readback, and completeness beyond flux-core compress/session/stream.
+Production defect (2026-07-15): `@sylphx/flux-wasm@0.1.0` published package.json-only
+because wasm-pack emits `wasm/.gitignore` with `*`, which npm pack honors — consumer
+install smoke fails (`Cannot find module .../flux_wasm.js`). Fix: strip that
+gitignore in build, fail-closed `scripts/check-flux-pack-integrity.sh` + consumer
+smoke, bump to `0.1.1`. Registry re-publish still requires `NPM_TOKEN` / trusted
+publishing.
+
+Adoption gaps remaining: publish `0.1.1` with non-empty wasm readback, fastpack
+differential + npm surface, completeness beyond flux-core compress/session/stream.
 Tracked in `.doctrine/project.json`.

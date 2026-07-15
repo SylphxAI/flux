@@ -47,4 +47,7 @@ for surface in "${LOADER_SURFACES[@]}"; do
   fi
 done
 
-echo "OK: Rust authority verified; TS packages are WASM/native loaders only"
+echo "==> flux-wasm npm pack integrity (empty-registry regression gate)"
+bash "$ROOT/scripts/check-flux-pack-integrity.sh"
+
+echo "OK: Rust authority verified; TS packages are WASM/native loaders only; pack integrity OK"

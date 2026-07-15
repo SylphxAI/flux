@@ -1,5 +1,6 @@
 # Publish path for @sylphx/flux + @sylphx/flux-wasm (library digest bind).
-# Fail-closed: does not claim prod_audit_pass; publish still requires npm OIDC/token.
+# Fail-closed: pack integrity required; never continue-on-error for publish.
+# Registry@0.1.0 was empty (wasm-pack .gitignore "*" blanked npm pack) — 0.1.1+ required.
 name: Release
 
 on:
@@ -27,6 +28,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -34,40 +37,50 @@ jobs:
       - name: Install JS deps
         run: npm install
 
-      - name: Build @sylphx/flux-wasm
-        run: npm run build:flux-wasm
+      - name: Pack integrity (fail-closed)
+        run: bash scripts/check-flux-pack-integrity.sh
 
-      - name: Build @sylphx/flux
-        run: npm -w @sylphx/flux run build
+      - name: Consumer smoke (local tarballs)
+        run: bash scripts/check-flux-consumer-smoke.sh
 
       - name: Publish @sylphx/flux-wasm
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
-          if ! npm view @sylphx/flux-wasm@0.1.0 version >/dev/null 2>&1; then
-            npm -w @sylphx/flux-wasm publish --access public --provenance
+          VER="$(node -p "require('./packages/flux-wasm/package.json').version")"
+          if npm view "@sylphx/flux-wasm@${VER}" version >/dev/null 2>&1; then
+            echo "@sylphx/flux-wasm@${VER} already on registry — skip"
           else
-            echo "@sylphx/flux-wasm@0.1.0 already on registry — skip"
+            npm -w @sylphx/flux-wasm publish --access public --provenance
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
 
       - name: Publish @sylphx/flux
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
-          if ! npm view @sylphx/flux@0.1.0 version >/dev/null 2>&1; then
-            npm -w @sylphx/flux publish --access public --provenance
+          VER="$(node -p "require('./packages/flux/package.json').version")"
+          if npm view "@sylphx/flux@${VER}" version >/dev/null 2>&1; then
+            echo "@sylphx/flux@${VER} already on registry — skip"
           else
-            echo "@sylphx/flux@0.1.0 already on registry — skip"
+            npm -w @sylphx/flux publish --access public --provenance
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
 
-      - name: Registry readback (best-effort)
+      - name: Registry readback (fail-closed after publish attempt)
         run: |
           set -euo pipefail
-          npm view @sylphx/flux version gitHead time --json || echo "flux not published yet"
-          npm view @sylphx/flux-wasm version gitHead time --json || echo "flux-wasm not published yet"
+          FLUX_VER="$(node -p "require('./packages/flux/package.json').version")"
+          WASM_VER="$(node -p "require('./packages/flux-wasm/package.json').version")"
+          npm view "@sylphx/flux@${FLUX_VER}" version gitHead dist.shasum --json
+          npm view "@sylphx/flux-wasm@${WASM_VER}" version gitHead dist.shasum --json
+          # Assert registry tarball is not package.json-only
+          TMP="$(mktemp -d)"
+          cd "$TMP"
+          npm pack "@sylphx/flux-wasm@${WASM_VER}"
+          tar -tzf "sylphx-flux-wasm-${WASM_VER}.tgz" | tee listing.txt
+          grep -q 'package/wasm/flux_wasm_bg.wasm' listing.txt
+          grep -q 'package/wasm/flux_wasm.js' listing.txt
+          echo "registry pack integrity OK for @sylphx/flux-wasm@${WASM_VER}"
