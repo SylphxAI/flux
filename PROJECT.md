@@ -48,12 +48,13 @@ internals or alter core behavior for a single application.
 ## Delivery
 
 - CI model: GitHub Actions (`.github/workflows/`)
-- Required contexts: `rust-parity-differential`
+- Required contexts: repository build, test, package-integrity, and consumer
+  smoke checks declared by the active workflow.
 - Deploy/release path: npm packages `@sylphx/flux` + `@sylphx/flux-wasm` via
   `.github/workflows/release.yml` on `main` (trusted publishing / NPM_TOKEN)
-- Production proof: `scripts/run-flux-differential.sh` main-bound green + npm
-  registry readback (`npm view @sylphx/flux gitHead` == publish commit) +
-  install smoke (`npm pack` / consumer compress roundtrip)
+- Production proof: Rust roundtrip/format tests + npm registry readback
+  (`npm view @sylphx/flux gitHead` == publish commit) + install smoke (`npm
+  pack` / consumer compress roundtrip).
 - Recovery class: `forward-fix-only`
 
 Release safety: packages are public-scoped (`@sylphx/*`) with versioned
@@ -68,6 +69,9 @@ gitignore in build, fail-closed `scripts/check-flux-pack-integrity.sh` + consume
 smoke, bump to `0.1.1`. Registry re-publish still requires `NPM_TOKEN` / trusted
 publishing.
 
-Adoption gaps remaining: publish `0.1.1` with non-empty wasm readback, fastpack
-differential + npm surface, completeness beyond flux-core compress/session/stream.
+Adoption gaps remaining: publish `0.1.1` with non-empty wasm readback and prove
+the Fastpack npm surface through its own roundtrip and package-integrity checks.
 Tracked in `.doctrine/project.json`.
+
+Rust owns compression semantics. TypeScript files are package adapters and
+consumer surfaces over Rust/WASM, not a second compression implementation.
