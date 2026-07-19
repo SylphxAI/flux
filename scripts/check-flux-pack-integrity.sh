@@ -13,7 +13,7 @@ SCRATCH="${SCRATCH_DIR:-/tmp/flux-pack-integrity}"
 mkdir -p "$SCRATCH"
 
 echo "==> build flux-wasm (wasm-pack)"
-npm -w @sylphx/flux-wasm run build
+bun run --cwd "$PKG_DIR" build
 
 # wasm-pack always emits a local .gitignore of "*" — strip it so npm pack includes artifacts.
 if [[ -f "$WASM_DIR/.gitignore" ]]; then
@@ -34,11 +34,11 @@ for f in "${REQUIRED[@]}"; do
   echo "OK present: $f ($(wc -c <"$f") bytes)"
 done
 
-echo "==> npm pack @sylphx/flux-wasm (integrity)"
+echo "==> pack @sylphx/flux-wasm (integrity)"
 (
   cd "$PKG_DIR"
   # Avoid re-entering prepack recursion when already built; pack uses on-disk files.
-  npm pack --ignore-scripts --pack-destination "$SCRATCH" >/dev/null
+  bun pm pack --ignore-scripts --destination "$SCRATCH" --quiet >/dev/null
 )
 
 TGZ="$(ls -1 "$SCRATCH"/sylphx-flux-wasm-*.tgz | sort | tail -1)"
