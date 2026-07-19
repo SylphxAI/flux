@@ -20,8 +20,8 @@
     "package.json"
   ],
   "scripts": {
-    "build": "wasm-pack build ../../crates/flux-wasm --target web --out-dir ./wasm --out-name flux_wasm && rm -f ./wasm/.gitignore && test -s ./wasm/flux_wasm_bg.wasm",
-    "prepack": "npm run build && test -s wasm/flux_wasm_bg.wasm && test -s wasm/flux_wasm.js",
+    "build": "wasm-pack build ../../crates/flux-wasm --target web --out-dir ../../packages/flux-wasm/wasm --out-name flux_wasm && rm -f ./wasm/.gitignore && test -s ./wasm/flux_wasm_bg.wasm",
+    "prepack": "bun run build && test -s wasm/flux_wasm_bg.wasm && test -s wasm/flux_wasm.js",
     "check:pack": "bash ../../scripts/check-flux-pack-integrity.sh"
   },
   "keywords": [
