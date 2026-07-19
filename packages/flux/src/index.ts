@@ -77,7 +77,7 @@ async function loadWasm(): Promise<FluxWasm> {
     const wasm = await import('@sylphx/flux-wasm');
     // Browser: generated glue fetches flux_wasm_bg.wasm via import.meta.url.
     // Node consumers of --target web should pass bytes (see scripts/check-flux-consumer-smoke.sh).
-    // Bun can load the default URL fetch path used by the differential oracle.
+    // Bun can load the default URL fetch path used by compatibility tests.
     await wasm.default?.();
     wasmModule = wasm as unknown as FluxWasm;
     return wasmModule;
