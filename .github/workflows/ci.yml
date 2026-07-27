@@ -9,9 +9,11 @@ permissions:
   contents: read
 jobs:
   rust:
-    runs-on: ubuntu-latest
+    runs-on: sylphx-linux-standard
     steps:
       - uses: actions/checkout@v4
+      - name: Enforce owned CI runner profiles
+        run: python3 .github/scripts/check-owned-runner-profiles.py
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -21,7 +23,7 @@ jobs:
         continue-on-error: true
         run: cargo clippy --all-targets -- -D warnings
   ts:
-    runs-on: ubuntu-latest
+    runs-on: sylphx-linux-standard
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
