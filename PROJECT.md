@@ -9,7 +9,6 @@ to evolve the compression format independently of any product.
 
 - State: `active`
 - Layer: `foundation`
-- Machine manifest: [`.doctrine/project.json`](./.doctrine/project.json)
 
 ## Goals
 
@@ -43,7 +42,7 @@ internals or alter core behavior for a single application.
 - TypeScript package metadata: `packages/flux/package.json`
 - Compression specification: `docs/FLUX_SPEC.md`
 - Human project orientation: `PROJECT.md`
-- Machine-readable project manifest: `.doctrine/project.json`
+- Machine-readable project manifest: 
 
 ## Delivery
 
@@ -71,7 +70,7 @@ publishing.
 
 Adoption gaps remaining: publish `0.1.1` with non-empty wasm readback and prove
 the Fastpack npm surface through its own roundtrip and package-integrity checks.
-Tracked in `.doctrine/project.json`.
+Tracked in .
 
 Rust owns compression semantics. TypeScript files are package adapters and
 consumer surfaces over Rust/WASM, not a second compression implementation.
