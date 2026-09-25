@@ -1,5 +1,7 @@
 # FLUX
 
+> **Archived — no longer maintained (2026-09-24).** This repository is read-only and has no replacement.
+
 High-performance JSON compression library optimized for API communication. Built with Rust + WebAssembly + TypeScript.
 
 ## Performance
